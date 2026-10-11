@@ -1,0 +1,9 @@
+This project is derived from dexd (https://github.com/ishioni/dexd),
+Copyright (c) 2026 Piotr Maksymiuk, used under the MIT License. See LICENSE.
+
+The MikroTik RouterOS provider was informed by:
+  - external-dns-provider-mikrotik
+    (https://github.com/mirceanton/external-dns-provider-mikrotik), Apache-2.0
+
+This is an independent, unofficial project, not affiliated with, endorsed by,
+or sponsored by MikroTik or Ubiquiti Inc.

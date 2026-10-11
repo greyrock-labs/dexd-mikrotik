@@ -79,16 +79,15 @@ func decodeTXTKeyHostname(hostname string) string {
 }
 
 // EncodeTXT produces the TXT record value for an ownership record.
-// UniFi requires the value to be double-quoted when it contains commas.
 func EncodeTXT(ownerID, resource string) string {
-	return fmt.Sprintf(`"heritage=%s,%s=%s,%s=%s"`,
+	return fmt.Sprintf(`heritage=%s,%s=%s,%s=%s`,
 		heritage, ownerField, ownerID, resourceField, resource)
 }
 
 // DecodeTXT parses the TXT record value. Returns (record, true) if it is a
 // valid dexd ownership record, (zero, false) otherwise.
 func DecodeTXT(value string) (OwnershipRecord, bool) {
-	// Strip surrounding quotes that UniFi stores/returns.
+	// Strip surrounding quotes some DNS backends store or return.
 	value = strings.Trim(value, `"`)
 
 	var rec OwnershipRecord

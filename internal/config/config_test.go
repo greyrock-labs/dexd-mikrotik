@@ -151,7 +151,8 @@ func TestLoadRejectsNonPositiveReconcileInterval(t *testing.T) {
 
 func setRequiredEnv(t *testing.T) {
 	t.Helper()
-	t.Setenv("UNIFI_HOST", "https://unifi.example.com")
-	t.Setenv("UNIFI_API_KEY", "secret")
+	t.Setenv("MIKROTIK_BASEURL", "https://router.example.com")
+	t.Setenv("MIKROTIK_USERNAME", "dexd")
+	t.Setenv("MIKROTIK_PASSWORD", "secret")
 	t.Setenv("DEFAULT_TARGET", "10.0.0.1")
 }

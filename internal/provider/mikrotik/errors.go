@@ -1,4 +1,4 @@
-package unifi
+package mikrotik
 
 import "fmt"
 
@@ -14,9 +14,9 @@ type APIError struct {
 
 func (e *APIError) Error() string {
 	if e.Message != "" {
-		return fmt.Sprintf("unifi API error during %s %s: HTTP %d: %s", e.Operation, e.URL, e.StatusCode, e.Message)
+		return fmt.Sprintf("mikrotik API error during %s %s: HTTP %d: %s", e.Operation, e.URL, e.StatusCode, e.Message)
 	}
-	return fmt.Sprintf("unifi API error during %s %s: HTTP %d: %s", e.Operation, e.URL, e.StatusCode, e.Body)
+	return fmt.Sprintf("mikrotik API error during %s %s: HTTP %d: %s", e.Operation, e.URL, e.StatusCode, e.Body)
 }
 
 type NetworkError struct {
@@ -26,7 +26,7 @@ type NetworkError struct {
 }
 
 func (e *NetworkError) Error() string {
-	return fmt.Sprintf("unifi network error during %s %s: %v", e.Operation, e.URL, e.Err)
+	return fmt.Sprintf("mikrotik network error during %s %s: %v", e.Operation, e.URL, e.Err)
 }
 
 func (e *NetworkError) Unwrap() error {
@@ -40,7 +40,7 @@ type DataError struct {
 }
 
 func (e *DataError) Error() string {
-	return fmt.Sprintf("unifi data error during %s of %s: %v", e.Operation, e.DataType, e.Err)
+	return fmt.Sprintf("mikrotik data error during %s of %s: %v", e.Operation, e.DataType, e.Err)
 }
 
 func (e *DataError) Unwrap() error {
@@ -54,12 +54,13 @@ type UnsupportedRecordError struct {
 }
 
 func (e *UnsupportedRecordError) Error() string {
-	return fmt.Sprintf("unsupported unifi DNS record %s %s: %s", e.RecordType, e.Key, e.Reason)
+	return fmt.Sprintf("unsupported mikrotik DNS record %s %s: %s", e.RecordType, e.Key, e.Reason)
 }
 
+// errorResponse is the RouterOS REST error body, e.g.
+// {"error":400,"message":"Bad Request","detail":"failure: entry already exists"}
 type errorResponse struct {
-	Code      string         `json:"code"`
-	Details   map[string]any `json:"details"`
-	ErrorCode int            `json:"errorCode"`
-	Message   string         `json:"message"`
+	Error   int    `json:"error"`
+	Message string `json:"message"`
+	Detail  string `json:"detail"`
 }

@@ -20,11 +20,12 @@ const (
 )
 
 type Config struct {
-	// UniFi
-	UnifiHost               string `env:"UNIFI_HOST,required"`
-	UnifiAPIKey             string `env:"UNIFI_API_KEY,required"`
-	UnifiSite               string `env:"UNIFI_SITE" envDefault:"default"`
-	UnifiInsecureSkipVerify bool   `env:"UNIFI_INSECURE_SKIP_VERIFY" envDefault:"true"`
+	// MikroTik RouterOS
+	MikrotikBaseURL       string `env:"MIKROTIK_BASEURL,required"`
+	MikrotikUsername      string `env:"MIKROTIK_USERNAME,required"`
+	MikrotikPassword      string `env:"MIKROTIK_PASSWORD,required"`
+	MikrotikSkipTLSVerify bool   `env:"MIKROTIK_SKIP_TLS_VERIFY" envDefault:"false"`
+	MikrotikCACert        string `env:"MIKROTIK_CA_CERT"`
 
 	// Docker
 	DockerHost string `env:"DOCKER_HOST" envDefault:"unix:///var/run/docker.sock"`

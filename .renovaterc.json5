@@ -1,6 +1,6 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["local>home-operations/renovate-config"],
+  extends: ["local>todd/renovate-config"],
   packageRules: [
     {
       description: "Bump the Go module directive across minor versions",
@@ -10,16 +10,11 @@
       rangeStrategy: "bump",
     },
     {
-      description: "Keep the Go module and mise toolchain versions aligned",
-      matchManagers: ["gomod", "mise"],
-      matchDepNames: ["go"],
+      description: "Keep the Go module, mise toolchain, and Dockerfile builder image aligned",
+      matchDepNames: ["go", "golang"],
       groupName: "Go toolchain",
       groupSlug: "go-toolchain",
     },
   ],
-  // Override the shared Helm task preset: this repository has no Helm charts.
-  postUpgradeTasks: {
-    commands: [],
-  },
-  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths"],
+  postUpdateOptions: ["gomodTidy"],
 }

@@ -45,6 +45,15 @@ func TestEndpointsFromLabels(t *testing.T) {
 			want: []endpointWant{{DNSName: "foo.example.com", Target: defaultTarget, RecordType: "A"}},
 		},
 		{
+			name:      "hostnames are lower-cased",
+			container: "c1",
+			labels: map[string]string{
+				"dexd.enabled":                  "true",
+				"traefik.http.routers.foo.rule": "Host(`Foo.Example.COM`)",
+			},
+			want: []endpointWant{{DNSName: "foo.example.com", Target: defaultTarget, RecordType: "A"}},
+		},
+		{
 			name:      "enabled without router rules has no endpoints",
 			container: "c1",
 			labels:    map[string]string{"dexd.enabled": "true"},

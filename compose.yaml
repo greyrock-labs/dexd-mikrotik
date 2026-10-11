@@ -1,0 +1,40 @@
+---
+# dexd — manages MikroTik RouterOS static DNS records for Traefik containers.
+# Deploy this alongside Traefik on your Docker host.
+services:
+  dexd:
+    image: "ghcr.io/greyrock-labs/dexd-mikrotik:latest"
+
+    # To build the image yourself
+    # build:
+    #   context: "./"
+    #   target: "runtime"
+    #   dockerfile: "./Dockerfile"
+
+    container_name: "dexd"
+    restart: "unless-stopped"
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+    # SEE README FOR ENVIRONMENT VARIABLES DOCUMENTATION
+    environment:
+      # Required
+      MIKROTIK_BASEURL: ${MIKROTIK_BASEURL} # e.g. https://192.168.88.1 (RouterOS www-ssl or www service)
+      MIKROTIK_USERNAME: ${MIKROTIK_USERNAME} # RouterOS user with read/write/api/rest-api policies
+      MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD}
+      DEFAULT_TARGET: ${DEFAULT_TARGET} # default target; IPv4 → A record, hostname → CNAME
+
+      # Optional (shown with defaults)
+      MIKROTIK_SKIP_TLS_VERIFY: ${MIKROTIK_SKIP_TLS_VERIFY:-false}
+      MIKROTIK_CA_CERT: ${MIKROTIK_CA_CERT:-} # path inside the container to a PEM CA bundle
+      TXT_OWNER: ${TXT_OWNER:-dexd}
+      TXT_PREFIX: ${TXT_PREFIX:-}
+      POLICY: ${POLICY:-sync}
+      DEFAULT_TTL: ${DEFAULT_TTL:-auto}
+      RECONCILE_INTERVAL: ${RECONCILE_INTERVAL:-5m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      DRY_RUN: ${DRY_RUN:-false}
+      METRICS_ADDR: ${METRICS_ADDR:-:8080}

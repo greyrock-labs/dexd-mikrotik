@@ -3,18 +3,18 @@
 External DNS, but for Docker!
 
 `dexd` is a lightweight Go agent that watches your Docker daemon and
-automatically creates/removes static DNS records on a **UniFi OS local
-controller** (UDM/UDR/UDM-Pro) for services exposed via Traefik.
+automatically creates/removes static DNS records on a **MikroTik RouterOS v7**
+router (`/ip dns static`, via the REST API) for services exposed via Traefik.
 
 It uses TXT ownership records so it can safely coexist with other DNS
-automation pointing at the same UniFi controller.
+automation (and hand-made entries) on the same router.
 
 ## How it works
 
 1. Scans running containers opted in with `dexd.enabled=true`.
 2. Extracts hostnames from `traefik.http.routers.<name>.rule: Host(\`...\`)` labels.
 3. Creates an **A** or **CNAME** record and a companion **TXT ownership record**
-   on UniFi for each hostname.
+   on the router for each hostname.
 4. Listens for Docker lifecycle events (start/stop/remove) and reconciles on a
    periodic interval — records are removed when containers disappear and new
    ones appear within seconds.
@@ -33,35 +33,48 @@ created outside dexd are safe.
 
 ## Deployment
 
-```yaml
+Images are published to `ghcr.io/greyrock-labs/dexd-mikrotik` for
+`linux/amd64` and `linux/arm64`, tagged `X.Y.Z`, `X.Y`, `X`, `latest`, and
+`sha-<commit>`. Pin a version in production.
+
+Copy `.env.example` to `.env` next to [`compose.yaml`](compose.yaml) and fill
+it in:
+
+```bash
 # .env
-UNIFI_HOST=https://10.1.2.1
-UNIFI_API_KEY=<PAT from UniFi Network settings>
-DEFAULT_TARGET=10.1.2.241
+MIKROTIK_BASEURL=https://192.168.88.1
+MIKROTIK_USERNAME=dexd
+MIKROTIK_PASSWORD=<password>
+DEFAULT_TARGET=192.0.2.10
 ```
 
 ```bash
 docker compose up -d
 ```
 
+dexd needs read-only access to the Docker socket, which `compose.yaml`
+mounts. Start with `DRY_RUN=true` and check the planned changes in
+`docker compose logs dexd` before letting it write to the router.
+
 ## Configuration
 
-| Environment variable         | Default      | Description                                                                             |
-| ---------------------------- | ------------ | --------------------------------------------------------------------------------------- |
-| `UNIFI_HOST`                 | **required** | UniFi controller URL, e.g. `https://10.1.2.1`                                           |
-| `UNIFI_API_KEY`              | **required** | Personal Access Token from UniFi Network                                                |
-| `DEFAULT_TARGET`             | **required** | Default target. IPv4 → A record, hostname → CNAME                                       |
-| `UNIFI_SITE`                 | `default`    | UniFi site name                                                                         |
-| `UNIFI_INSECURE_SKIP_VERIFY` | `true`       | Skip TLS verification (self-signed certs)                                               |
-| `TXT_OWNER`                  | `dexd`       | Scopes TXT ownership; change if running multiple instances                              |
-| `TXT_PREFIX`                 | empty        | Optional prefix for ownership TXT record names                                          |
-| `POLICY`                     | `sync`       | Change policy: `sync`, `upsert-only`, or `create-only`                                  |
-| `DEFAULT_TTL`                | `auto`       | TTL for created A/CNAME records. Use `auto` to let UniFi choose, or a positive integer. |
-| `RECONCILE_INTERVAL`         | `5m`         | How often to run a full reconcile                                                       |
-| `LOG_LEVEL`                  | `info`       | `debug`, `info`, `warn`, or `error`                                                     |
-| `LOG_FORMAT`                 | `text`       | `text` or `json`                                                                        |
-| `DRY_RUN`                    | `false`      | List current UniFi records and log planned changes without mutating UniFi               |
-| `METRICS_ADDR`               | `:8080`      | Address for the Prometheus metrics HTTP server. Empty disables metrics.                 |
+| Environment variable       | Default      | Description                                                                                      |
+| -------------------------- | ------------ | ------------------------------------------------------------------------------------------------ |
+| `MIKROTIK_BASEURL`         | **required** | RouterOS web service URL, e.g. `https://192.168.88.1` (the REST API lives under `/rest`)         |
+| `MIKROTIK_USERNAME`        | **required** | RouterOS user name                                                                               |
+| `MIKROTIK_PASSWORD`        | **required** | RouterOS user password                                                                           |
+| `DEFAULT_TARGET`           | **required** | Default target. IPv4 → A record, hostname → CNAME                                                |
+| `MIKROTIK_SKIP_TLS_VERIFY` | `false`      | Skip TLS verification (e.g. the router's self-signed certificate)                                |
+| `MIKROTIK_CA_CERT`         | empty        | Path to a PEM CA certificate to trust in addition to the system pool                             |
+| `TXT_OWNER`                | `dexd`       | Scopes TXT ownership; change if running multiple instances                                       |
+| `TXT_PREFIX`               | empty        | Optional prefix for ownership TXT record names                                                   |
+| `POLICY`                   | `sync`       | Change policy: `sync`, `upsert-only`, or `create-only`                                           |
+| `DEFAULT_TTL`              | `auto`       | TTL in seconds for created/updated records. `auto` omits it so RouterOS uses its default (`1d`). |
+| `RECONCILE_INTERVAL`       | `5m`         | How often to run a full reconcile                                                                |
+| `LOG_LEVEL`                | `info`       | `debug`, `info`, `warn`, or `error`                                                              |
+| `LOG_FORMAT`               | `text`       | `text` or `json`                                                                                 |
+| `DRY_RUN`                  | `false`      | List current router records and log planned changes without mutating them                        |
+| `METRICS_ADDR`             | `:8080`      | Address for the Prometheus metrics HTTP server. Empty disables metrics.                          |
 
 ### Policy
 
@@ -73,7 +86,7 @@ docker compose up -d
 | `upsert-only` | yes     | yes     | yes                  | no stale-record or orphan-TXT cleanup |
 | `create-only` | yes     | no      | no                   | no                                    |
 
-`upsert-only` allows A/CNAME replacements because they are updates by intent. UniFi may require deleting the old owned record before creating the replacement record with the same hostname.
+`upsert-only` allows A/CNAME replacements because they are updates by intent. The old owned record is deleted before the replacement record with the same hostname is created.
 
 ## Metrics
 
@@ -91,7 +104,7 @@ increase(dexd_provider_errors_total[10m]) > 0
 
 `deploy/prometheusrule.yaml` includes alerts for stale successful reconciles, source/reconcile/change/provider errors, and slow reconciles. Apply it in clusters using the Prometheus Operator.
 
-Import [`deploy/grafana-dashboard.json`](deploy/grafana-dashboard.json) into Grafana to monitor reconciliation health, managed DNS records, plans and applied DNS changes, Docker events, UniFi provider requests/latency, errors, build information, and the Go process runtime. The dashboard includes datasource, `job`, and `instance` variables so it works with any Prometheus scrape configuration. **Managed UniFi Records** counts the desired A/CNAME records and their companion TXT ownership records, broken down by `record_type`; it does not expose the complete UniFi static-DNS inventory.
+Import [`deploy/grafana-dashboard.json`](deploy/grafana-dashboard.json) into Grafana to monitor reconciliation health, managed DNS records, plans and applied DNS changes, Docker events, MikroTik provider requests/latency, errors, build information, and the Go process runtime. The dashboard includes datasource, `job`, and `instance` variables so it works with any Prometheus scrape configuration. **Managed MikroTik Records** counts the desired A/CNAME records and their companion TXT ownership records, broken down by `record_type`; it does not expose the complete RouterOS static-DNS inventory.
 
 Useful dashboard metrics:
 
@@ -175,19 +188,31 @@ labels:
 labels:
   dexd.enabled: "true"
   dexd.hosts.dashboard.hostnames: "traefik.${DOMAIN}"
-  dexd.hosts.dashboard.target: "10.1.2.241"
+  dexd.hosts.dashboard.target: "192.0.2.10"
 ```
 
 `dexd.hosts.<name>.target` is optional and falls back to container-level
 `dexd.target`, then `DEFAULT_TARGET`. `dexd.hosts.<name>.skip=true` skips the
 whole standalone block, including all configured hostnames.
 
-UniFi does not support wildcard CNAME records. If a hostname such as
-`*.example.com` resolves to a CNAME target, `dexd` logs a warning, increments
-the provider error metric with `type="unsupported"`, skips that record, and
-continues applying supported records. Wildcard A records are supported; their
-ownership TXT record replaces the `*` label with `wildcard-dexd` so UniFi
-accepts the TXT hostname.
+### Wildcards
+
+RouterOS static DNS has no wildcard names, so a hostname such as
+`*.example.com` is written as a **regexp** entry, `^.+\.example\.com$`, with
+no `name`. Both A and CNAME wildcards are supported. The ownership TXT record
+replaces the `*` label with `wildcard-dexd`, e.g. `a-wildcard-dexd.example.com`.
+Only a single leading `*.` label is supported; other wildcard forms are logged,
+counted as `dexd_provider_errors_total{type="unsupported"}`, and skipped.
+
+> **Caveat:** RouterOS checks regexp entries **before** plain entries. A
+> wildcard therefore shadows more specific static entries beneath it: with
+> `*.example.com` present, a static entry for `foo.example.com` on the router is
+> not used. This differs from normal DNS wildcard semantics. Prefer wildcards
+> on dedicated subdomains, such as `*.s3.example.com`.
+
+dexd only manages regexp entries in exactly the form it writes. Hand-made
+regexp entries (ad-blocking lists, for example) and `FWD`/`NXDOMAIN`/other
+entry types are ignored.
 
 ### Native ownership and labels
 
@@ -196,22 +221,66 @@ records. Records created by versions before this breaking change are not
 considered owned and must be removed or migrated manually before using
 `POLICY=sync`.
 
-## Getting a UniFi PAT
+## Preparing the router
 
-In UniFi Network, go to **Settings → Admins & Users → [your admin] → API Access**
-and create a new Personal Access Token. UniFi Network 9.0+ is required for PAT
-support.
+dexd uses the RouterOS v7 REST API, which is served by the `www-ssl` (or
+`www`) IP service. Enable HTTPS and create a dedicated user. A group with
+`read`, `write`, `api` and `rest-api` is enough (drop `rest-api` on older
+RouterOS 7 releases that do not have that policy):
 
-## Building
+```routeros
+/certificate add name=local-root-cert common-name=local-cert key-usage=key-cert-sign,crl-sign
+/certificate sign local-root-cert
+/certificate add name=webfig common-name=192.168.88.1
+/certificate sign webfig ca=local-root-cert
+/ip service set www-ssl certificate=webfig disabled=no
 
-```bash
-go build ./cmd/dexd
+/user group add name=dexd policy=read,write,api,rest-api
+/user add name=dexd group=dexd password=<password>
 ```
 
-or with Docker, using the Go version pinned by mise:
+With a self-signed certificate, set `MIKROTIK_SKIP_TLS_VERIFY=true` or export
+the CA and point `MIKROTIK_CA_CERT` at it. Plain HTTP (`http://`, `www`
+service) also works but sends credentials in cleartext.
 
-```bash
-mise run docker-build
+Records written by dexd look like this on the router:
+
+```routeros
+/ip dns static print where name~"example.com" or regexp~"example"
 ```
 
-The equivalent Make target is `make docker-build`.
+TXT ownership values are stored unquoted, e.g.
+`heritage=dexd,dexd/owner=dexd,dexd/resource=docker/myapp`. Values wrapped in
+double quotes are also recognized.
+
+## Development
+
+[mise](https://mise.jdx.dev) pins the toolchain (Go, golangci-lint, oxfmt) and
+defines the tasks CI runs. `mise tasks` lists them.
+
+```bash
+mise run test          # unit + integration tests, race detector
+mise run lint          # golangci-lint
+mise run dev           # run against your router, loading .env
+mise run docker-build  # docker buildx bake -> dexd-mikrotik:local
+```
+
+## Releases
+
+CI (`.forgejo/workflows/ci.yaml`) runs formatting, tidiness, vet, lint, build,
+and tests on every push to `main` and on pull requests.
+
+Releases are cut by pushing an annotated `v*` tag. `.forgejo/workflows/release.yaml`
+runs the tests, then builds the multi-arch image with `docker-bake.hcl` and
+pushes it to GHCR. The tag is the only version input; see
+[`.agents/skills/cutting-a-release`](.agents/skills/cutting-a-release/SKILL.md).
+
+The Forgejo repository needs `GHCR_USERNAME` and `GHCR_TOKEN` secrets (a token
+with `write:packages` on the `greyrock-labs` organization).
+
+## Credits
+
+Derived from [ishioni/dexd](https://github.com/ishioni/dexd). The RouterOS
+provider was informed by
+[external-dns-provider-mikrotik](https://github.com/mirceanton/external-dns-provider-mikrotik).
+See [`NOTICE`](NOTICE).

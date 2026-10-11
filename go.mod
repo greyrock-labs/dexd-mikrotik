@@ -1,4 +1,4 @@
-module github.com/ishioni/dexd
+module github.com/greyrock-labs/dexd-mikrotik
 
 go 1.27.1
 

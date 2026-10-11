@@ -1,19 +1,19 @@
 // Package plan computes the minimal set of DNS changes needed to bring
-// the current UniFi records into sync with the desired state derived from
+// the current MikroTik records into sync with the desired state derived from
 // running containers.
 package plan
 
 import (
 	"log/slog"
 
-	"github.com/ishioni/dexd/internal/provider/unifi"
-	"github.com/ishioni/dexd/internal/registry"
-	"github.com/ishioni/dexd/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/registry"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // Changes holds the buckets of DNS work to perform.
 type Changes struct {
-	// Create holds endpoints that don't yet have a matching record in UniFi.
+	// Create holds endpoints that don't yet have a matching record in MikroTik.
 	Create []*source.Endpoint
 	// Update holds endpoints whose record exists but has a different target value.
 	Update []*source.Endpoint
@@ -21,14 +21,14 @@ type Changes struct {
 	// different record type and must be replaced before the desired record can be created.
 	Replace []Replace
 	// Delete holds A/CNAME records owned by us that are no longer in the desired set.
-	Delete []unifi.DNSRecord
+	Delete []mikrotik.DNSRecord
 	// OrphanTXT holds TXT ownership records we own that have no companion A/CNAME
-	// and are no longer desired. They should be deleted to keep UniFi clean.
-	OrphanTXT []unifi.DNSRecord
+	// and are no longer desired. They should be deleted to keep MikroTik clean.
+	OrphanTXT []mikrotik.DNSRecord
 }
 
 type Replace struct {
-	Old     unifi.DNSRecord
+	Old     mikrotik.DNSRecord
 	Desired *source.Endpoint
 }
 
@@ -37,7 +37,7 @@ type recordKey struct {
 	RecordType string
 }
 
-// Compute diffs desired endpoints against the current UniFi records and
+// Compute diffs desired endpoints against the current MikroTik records and
 // returns what needs to change. It only touches records whose companion
 // TXT ownership record matches ownerID — all others are left untouched.
 // txtPrefix must match the value used when writing TXT keys (see registry.TXTKey).
@@ -63,10 +63,10 @@ func DesiredRecordCounts(desired []*source.Endpoint) map[string]int {
 	return counts
 }
 
-func Compute(desired []*source.Endpoint, current []unifi.DNSRecord, ownerID, txtPrefix string) Changes {
+func Compute(desired []*source.Endpoint, current []mikrotik.DNSRecord, ownerID, txtPrefix string) Changes {
 	// Build lookup maps from current records.
-	aOrCnameByKey := make(map[recordKey]unifi.DNSRecord)
-	txtByKey := make(map[string]unifi.DNSRecord) // ownership TXT key → TXT record
+	aOrCnameByKey := make(map[recordKey]mikrotik.DNSRecord)
+	txtByKey := make(map[string]mikrotik.DNSRecord) // ownership TXT key → TXT record
 
 	for _, r := range current {
 		switch r.RecordType {
@@ -129,7 +129,7 @@ func Compute(desired []*source.Endpoint, current []unifi.DNSRecord, ownerID, txt
 			}
 			changes.Create = append(changes.Create, ep)
 		} else if !owned[key] {
-			// Record exists in UniFi but we did not create it — warn every reconcile.
+			// Record exists in MikroTik but we did not create it — warn every reconcile.
 			slog.Warn("unowned record at desired hostname; skipping until manually resolved",
 				"hostname", key.Hostname,
 				"record_type", key.RecordType,
@@ -171,9 +171,9 @@ func Compute(desired []*source.Endpoint, current []unifi.DNSRecord, ownerID, txt
 func ownedOtherType(
 	key recordKey,
 	desiredByKey map[recordKey]*source.Endpoint,
-	aOrCnameByKey map[recordKey]unifi.DNSRecord,
+	aOrCnameByKey map[recordKey]mikrotik.DNSRecord,
 	owned map[recordKey]bool,
-) (unifi.DNSRecord, bool) {
+) (mikrotik.DNSRecord, bool) {
 	for _, recordType := range []string{"A", "CNAME"} {
 		if recordType == key.RecordType {
 			continue
@@ -187,10 +187,10 @@ func ownedOtherType(
 			return rec, true
 		}
 	}
-	return unifi.DNSRecord{}, false
+	return mikrotik.DNSRecord{}, false
 }
 
-func otherTypeRecord(key recordKey, aOrCnameByKey map[recordKey]unifi.DNSRecord) (unifi.DNSRecord, bool) {
+func otherTypeRecord(key recordKey, aOrCnameByKey map[recordKey]mikrotik.DNSRecord) (mikrotik.DNSRecord, bool) {
 	for _, recordType := range []string{"A", "CNAME"} {
 		if recordType == key.RecordType {
 			continue
@@ -200,5 +200,5 @@ func otherTypeRecord(key recordKey, aOrCnameByKey map[recordKey]unifi.DNSRecord)
 			return rec, true
 		}
 	}
-	return unifi.DNSRecord{}, false
+	return mikrotik.DNSRecord{}, false
 }

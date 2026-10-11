@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ishioni/dexd/internal/config"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -163,7 +163,7 @@ func Handler() http.Handler {
 }
 
 func SetBuildInfo(version, gitsha string, policy config.Policy) {
-	buildInfo.WithLabelValues(version, gitsha, string(policy), "unifi").Set(1)
+	buildInfo.WithLabelValues(version, gitsha, string(policy), "mikrotik").Set(1)
 }
 
 func ObserveReconcile(duration time.Duration, success bool) {

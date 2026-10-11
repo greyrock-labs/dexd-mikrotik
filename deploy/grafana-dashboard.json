@@ -141,7 +141,7 @@
           "refId": "A"
         }
       ],
-      "title": "Managed UniFi Records",
+      "title": "Managed MikroTik Records",
       "type": "stat"
     },
     {
@@ -544,7 +544,7 @@
       },
       "id": 13,
       "panels": [],
-      "title": "UniFi Provider",
+      "title": "MikroTik Provider",
       "type": "row"
     },
     {
@@ -963,7 +963,7 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["dexd", "dns", "unifi"],
+  "tags": ["dexd", "dns", "mikrotik"],
   "templating": {
     "list": [
       {

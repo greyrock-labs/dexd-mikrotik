@@ -6,12 +6,12 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/ishioni/dexd/internal/config"
-	appmetrics "github.com/ishioni/dexd/internal/metrics"
-	"github.com/ishioni/dexd/internal/plan"
-	"github.com/ishioni/dexd/internal/provider/unifi"
-	"github.com/ishioni/dexd/internal/registry"
-	"github.com/ishioni/dexd/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
+	appmetrics "github.com/greyrock-labs/dexd-mikrotik/internal/metrics"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/plan"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/registry"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // Controller orchestrates the reconcile loop.
@@ -261,12 +261,12 @@ func applyPolicy(changes plan.Changes, policy config.Policy) plan.Changes {
 	}
 }
 
-func (c *Controller) createPair(ctx context.Context, ep *source.Endpoint, current []unifi.DNSRecord) error {
+func (c *Controller) createPair(ctx context.Context, ep *source.Endpoint, current []mikrotik.DNSRecord) error {
 	if err := c.upsertTXT(ctx, ep, current); err != nil {
 		return err
 	}
 
-	_, err := c.provider.CreateRecord(ctx, unifi.DNSRecord{
+	_, err := c.provider.CreateRecord(ctx, mikrotik.DNSRecord{
 		Key:        ep.DNSName,
 		RecordType: ep.RecordType,
 		Value:      ep.Target,
@@ -279,16 +279,16 @@ func (c *Controller) validateEndpoint(ep *source.Endpoint) error {
 	if !ok {
 		return nil
 	}
-	return validator.ValidateRecord(unifi.DNSRecord{
+	return validator.ValidateRecord(mikrotik.DNSRecord{
 		Key:        ep.DNSName,
 		RecordType: ep.RecordType,
 		Value:      ep.Target,
 	})
 }
 
-func (c *Controller) upsertTXT(ctx context.Context, ep *source.Endpoint, current []unifi.DNSRecord) error {
+func (c *Controller) upsertTXT(ctx context.Context, ep *source.Endpoint, current []mikrotik.DNSRecord) error {
 	txtKey := registry.TXTKey(c.txtPrefix, ep.RecordType, ep.DNSName)
-	newTXT := unifi.DNSRecord{
+	newTXT := mikrotik.DNSRecord{
 		Key:        txtKey,
 		RecordType: "TXT",
 		Value:      registry.EncodeTXT(ep.OwnerID, ep.Resource),
@@ -309,7 +309,7 @@ func (c *Controller) upsertTXT(ctx context.Context, ep *source.Endpoint, current
 	return err
 }
 
-func (c *Controller) updatePair(ctx context.Context, ep *source.Endpoint, current []unifi.DNSRecord) error {
+func (c *Controller) updatePair(ctx context.Context, ep *source.Endpoint, current []mikrotik.DNSRecord) error {
 	// Find the existing A/CNAME record by key to get its ID.
 	aRec := findRecord(current, ep.DNSName, ep.RecordType)
 	if aRec == nil {
@@ -327,14 +327,14 @@ func (c *Controller) updatePair(ctx context.Context, ep *source.Endpoint, curren
 	return nil
 }
 
-func (c *Controller) replacePair(ctx context.Context, old unifi.DNSRecord, desired *source.Endpoint, current []unifi.DNSRecord) error {
+func (c *Controller) replacePair(ctx context.Context, old mikrotik.DNSRecord, desired *source.Endpoint, current []mikrotik.DNSRecord) error {
 	if err := c.deletePair(ctx, old, current); err != nil {
 		return err
 	}
 	return c.createPair(ctx, desired, current)
 }
 
-func (c *Controller) deletePair(ctx context.Context, aRec unifi.DNSRecord, current []unifi.DNSRecord) error {
+func (c *Controller) deletePair(ctx context.Context, aRec mikrotik.DNSRecord, current []mikrotik.DNSRecord) error {
 	if err := c.provider.DeleteRecord(ctx, aRec.ID, aRec.Key, aRec.RecordType); err != nil {
 		return err
 	}
@@ -348,7 +348,7 @@ func (c *Controller) deletePair(ctx context.Context, aRec unifi.DNSRecord, curre
 }
 
 // findRecord searches current records for one matching key and recordType.
-func findRecord(records []unifi.DNSRecord, key, recordType string) *unifi.DNSRecord {
+func findRecord(records []mikrotik.DNSRecord, key, recordType string) *mikrotik.DNSRecord {
 	for i := range records {
 		if records[i].Key == key && records[i].RecordType == recordType {
 			return &records[i]

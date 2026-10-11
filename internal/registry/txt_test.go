@@ -119,10 +119,10 @@ func TestParseTXTKey(t *testing.T) {
 	}
 }
 
-func TestEncodeTXT_IsQuoted(t *testing.T) {
+func TestEncodeTXT_IsUnquoted(t *testing.T) {
 	got := EncodeTXT("owner-1", "docker/whoami")
-	if !strings.HasPrefix(got, `"`) || !strings.HasSuffix(got, `"`) {
-		t.Errorf("EncodeTXT must wrap value in double quotes for UniFi, got %q", got)
+	if strings.Contains(got, `"`) {
+		t.Errorf("EncodeTXT must not add quotes (RouterOS stores text literally), got %q", got)
 	}
 	if !strings.Contains(got, "heritage=dexd") {
 		t.Errorf("encoded value missing heritage marker: %q", got)

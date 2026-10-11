@@ -3,8 +3,8 @@ package controller
 import (
 	"context"
 
-	"github.com/ishioni/dexd/internal/provider/unifi"
-	"github.com/ishioni/dexd/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // Event is a lightweight, source-agnostic notification that desired
@@ -23,9 +23,9 @@ type Source interface {
 
 // Provider is the DNS backend the controller drives.
 type Provider interface {
-	ListRecords(ctx context.Context) ([]unifi.DNSRecord, error)
-	CreateRecord(ctx context.Context, r unifi.DNSRecord) (unifi.DNSRecord, error)
-	UpdateRecord(ctx context.Context, r unifi.DNSRecord) (unifi.DNSRecord, error)
+	ListRecords(ctx context.Context) ([]mikrotik.DNSRecord, error)
+	CreateRecord(ctx context.Context, r mikrotik.DNSRecord) (mikrotik.DNSRecord, error)
+	UpdateRecord(ctx context.Context, r mikrotik.DNSRecord) (mikrotik.DNSRecord, error)
 	DeleteRecord(ctx context.Context, id, key, recordType string) error
 }
 
@@ -33,5 +33,5 @@ type Provider interface {
 // to reject records that their backend cannot represent without failing the
 // whole reconcile.
 type RecordValidator interface {
-	ValidateRecord(r unifi.DNSRecord) error
+	ValidateRecord(r mikrotik.DNSRecord) error
 }

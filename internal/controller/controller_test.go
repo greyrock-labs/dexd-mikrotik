@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ishioni/dexd/internal/config"
-	"github.com/ishioni/dexd/internal/provider/unifi"
-	"github.com/ishioni/dexd/internal/registry"
-	"github.com/ishioni/dexd/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/registry"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // ---- fakes ----
@@ -39,12 +39,12 @@ func (f *fakeSource) Events(_ context.Context) (<-chan Event, <-chan error) {
 
 type providerCall struct {
 	Op     string
-	Record unifi.DNSRecord
+	Record mikrotik.DNSRecord
 }
 
 type fakeProvider struct {
 	mu      sync.Mutex
-	initial []unifi.DNSRecord
+	initial []mikrotik.DNSRecord
 	calls   []providerCall
 	nextID  int
 	failOn  map[string]error // keyed by "op:key"
@@ -66,20 +66,20 @@ func (f *fakeProvider) failKey(op, key string) error {
 	return f.failOn[op+":"+key]
 }
 
-func (f *fakeProvider) ListRecords(_ context.Context) ([]unifi.DNSRecord, error) {
+func (f *fakeProvider) ListRecords(_ context.Context) ([]mikrotik.DNSRecord, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, providerCall{Op: "list"})
-	return append([]unifi.DNSRecord(nil), f.initial...), nil
+	return append([]mikrotik.DNSRecord(nil), f.initial...), nil
 }
 
-func (f *fakeProvider) CreateRecord(_ context.Context, r unifi.DNSRecord) (unifi.DNSRecord, error) {
+func (f *fakeProvider) CreateRecord(_ context.Context, r mikrotik.DNSRecord) (mikrotik.DNSRecord, error) {
 	err := f.failKey("create", r.Key)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err != nil {
 		f.calls = append(f.calls, providerCall{Op: "create", Record: r})
-		return unifi.DNSRecord{}, err
+		return mikrotik.DNSRecord{}, err
 	}
 	f.nextID++
 	r.ID = fmt.Sprintf("id-%d", f.nextID)
@@ -87,20 +87,20 @@ func (f *fakeProvider) CreateRecord(_ context.Context, r unifi.DNSRecord) (unifi
 	return r, nil
 }
 
-func (f *fakeProvider) UpdateRecord(_ context.Context, r unifi.DNSRecord) (unifi.DNSRecord, error) {
+func (f *fakeProvider) UpdateRecord(_ context.Context, r mikrotik.DNSRecord) (mikrotik.DNSRecord, error) {
 	err := f.failKey("update", r.Key)
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, providerCall{Op: "update", Record: r})
 	if err != nil {
-		return unifi.DNSRecord{}, err
+		return mikrotik.DNSRecord{}, err
 	}
 	return r, nil
 }
 
 func (f *fakeProvider) DeleteRecord(_ context.Context, id, key, recordType string) error {
 	err := f.failKey("delete", key)
-	r := unifi.DNSRecord{ID: id, Key: key, RecordType: recordType}
+	r := mikrotik.DNSRecord{ID: id, Key: key, RecordType: recordType}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, providerCall{Op: "delete", Record: r})
@@ -125,16 +125,16 @@ func epType(name, target, recordType string) *source.Endpoint {
 	}
 }
 
-func aRec(id, key, value string) unifi.DNSRecord {
-	return unifi.DNSRecord{ID: id, Key: key, RecordType: "A", Value: value, Enabled: true}
+func aRec(id, key, value string) mikrotik.DNSRecord {
+	return mikrotik.DNSRecord{ID: id, Key: key, RecordType: "A", Value: value}
 }
 
-func ownedTXT(id, hostname, owner string) unifi.DNSRecord {
+func ownedTXT(id, hostname, owner string) mikrotik.DNSRecord {
 	return ownedTXTType("", id, "A", hostname, owner)
 }
 
-func ownedTXTType(prefix, id, recordType, hostname, owner string) unifi.DNSRecord {
-	return unifi.DNSRecord{
+func ownedTXTType(prefix, id, recordType, hostname, owner string) mikrotik.DNSRecord {
+	return mikrotik.DNSRecord{
 		ID:         id,
 		Key:        registry.TXTKey(prefix, recordType, hostname),
 		RecordType: "TXT",
@@ -212,7 +212,7 @@ func TestReconcile_CreatesCNAMEPair(t *testing.T) {
 func TestReconcile_NoOpWhenMatching(t *testing.T) {
 	src := &fakeSource{endpoints: []*source.Endpoint{ep("foo.example.com", "10.0.0.1")}}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			aRec("a1", "foo.example.com", "10.0.0.1"),
 			ownedTXT("t1", "foo.example.com", testOwner),
 		},
@@ -227,7 +227,7 @@ func TestReconcile_NoOpWhenMatching(t *testing.T) {
 func TestReconcile_UpdatesOwnedPair(t *testing.T) {
 	src := &fakeSource{endpoints: []*source.Endpoint{ep("foo.example.com", "10.0.0.2")}}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			aRec("a1", "foo.example.com", "10.0.0.1"),
 			ownedTXT("t1", "foo.example.com", testOwner),
 		},
@@ -253,7 +253,7 @@ func TestReconcile_UpdatesOwnedPair(t *testing.T) {
 func TestReconcile_DeletesOwnedPair(t *testing.T) {
 	src := &fakeSource{endpoints: nil}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			aRec("a1", "foo.example.com", "10.0.0.1"),
 			ownedTXT("t1", "foo.example.com", testOwner),
 		},
@@ -272,7 +272,7 @@ func TestReconcile_DeletesOwnedPair(t *testing.T) {
 func TestReconcile_SkipsUnownedRecord(t *testing.T) {
 	src := &fakeSource{endpoints: nil}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			aRec("a1", "foo.example.com", "10.0.0.1"),
 			// no TXT — not managed by us
 		},
@@ -287,7 +287,7 @@ func TestReconcile_SkipsUnownedRecord(t *testing.T) {
 func TestReconcile_SkipsForeignOwnedRecord(t *testing.T) {
 	src := &fakeSource{endpoints: nil}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			aRec("a1", "foo.example.com", "10.0.0.1"),
 			ownedTXT("t1", "foo.example.com", "someone-else"),
 		},
@@ -304,7 +304,7 @@ func TestReconcile_RecreateMissingA_UpsertsTXT(t *testing.T) {
 	// Expect: CreateRecord for A, UpdateRecord (not CreateRecord) for the TXT.
 	src := &fakeSource{endpoints: []*source.Endpoint{ep("foo.example.com", "10.0.0.1")}}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			ownedTXT("t1", "foo.example.com", testOwner), // TXT present, A missing
 		},
 	}
@@ -339,7 +339,7 @@ func TestReconcile_DoesNotCreateRecordWhenTXTCreateFails(t *testing.T) {
 func TestReconcile_ReplacesOwnedRecordTypeBeforeCreate(t *testing.T) {
 	src := &fakeSource{endpoints: []*source.Endpoint{epType("foo.example.com", "target.example.com", "CNAME")}}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			aRec("a1", "foo.example.com", "10.0.0.1"),
 			ownedTXT("t1", "foo.example.com", testOwner),
 		},
@@ -365,7 +365,7 @@ func TestReconcile_DeletesOrphanTXT(t *testing.T) {
 	// Expect: one delete call for the TXT with RecordType=TXT.
 	src := &fakeSource{endpoints: nil}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			ownedTXT("t1", "foo.example.com", testOwner), // TXT present, A missing, not desired
 		},
 	}
@@ -390,7 +390,7 @@ func TestReconcile_DeletesOrphanTXT(t *testing.T) {
 func TestReconcile_UpsertOnlyDoesNotDeleteStalePairOrOrphanTXT(t *testing.T) {
 	src := &fakeSource{endpoints: nil}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			aRec("a1", "foo.example.com", "10.0.0.1"),
 			ownedTXT("t1", "foo.example.com", testOwner),
 			ownedTXT("t2", "orphan.example.com", testOwner),
@@ -407,7 +407,7 @@ func TestReconcile_UpsertOnlyUpdatesAndReplaces(t *testing.T) {
 	t.Run("update", func(t *testing.T) {
 		src := &fakeSource{endpoints: []*source.Endpoint{ep("foo.example.com", "10.0.0.2")}}
 		prov := &fakeProvider{
-			initial: []unifi.DNSRecord{
+			initial: []mikrotik.DNSRecord{
 				aRec("a1", "foo.example.com", "10.0.0.1"),
 				ownedTXT("t1", "foo.example.com", testOwner),
 			},
@@ -422,7 +422,7 @@ func TestReconcile_UpsertOnlyUpdatesAndReplaces(t *testing.T) {
 	t.Run("replace", func(t *testing.T) {
 		src := &fakeSource{endpoints: []*source.Endpoint{epType("foo.example.com", "target.example.com", "CNAME")}}
 		prov := &fakeProvider{
-			initial: []unifi.DNSRecord{
+			initial: []mikrotik.DNSRecord{
 				aRec("a1", "foo.example.com", "10.0.0.1"),
 				ownedTXT("t1", "foo.example.com", testOwner),
 			},
@@ -445,7 +445,7 @@ func TestReconcile_CreateOnlyCreatesOnly(t *testing.T) {
 		epType("flip.example.com", "target.example.com", "CNAME"),
 	}}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			aRec("a1", "foo.example.com", "10.0.0.1"),
 			ownedTXT("t1", "foo.example.com", testOwner),
 			aRec("a2", "stale.example.com", "10.0.0.1"),
@@ -470,7 +470,7 @@ func TestReconcile_CreateOnlyCreatesOnly(t *testing.T) {
 func TestReconcile_CreateOnlyDoesNotUpdateOwnedOrphanTXT(t *testing.T) {
 	src := &fakeSource{endpoints: []*source.Endpoint{ep("foo.example.com", "10.0.0.1")}}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			ownedTXT("t1", "foo.example.com", testOwner),
 		},
 	}
@@ -487,7 +487,7 @@ func TestReconcile_CreateOnlyDoesNotUpdateOwnedOrphanTXT(t *testing.T) {
 func TestReconcile_DoesNotClaimForeignOrphanTXT(t *testing.T) {
 	src := &fakeSource{endpoints: []*source.Endpoint{ep("foo.example.com", "10.0.0.1")}}
 	prov := &fakeProvider{
-		initial: []unifi.DNSRecord{
+		initial: []mikrotik.DNSRecord{
 			ownedTXT("t1", "foo.example.com", "someone-else"),
 		},
 	}

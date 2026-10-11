@@ -114,7 +114,8 @@ func EndpointsFromLabels(containerName string, labels map[string]string, default
 			return endpoints
 		}
 		return append(endpoints, &Endpoint{
-			DNSName:    dnsName,
+			// DNS is case-insensitive and RouterOS matches lower-cased names.
+			DNSName:    strings.ToLower(dnsName),
 			Target:     target,
 			RecordType: recordType,
 			OwnerID:    ownerID,

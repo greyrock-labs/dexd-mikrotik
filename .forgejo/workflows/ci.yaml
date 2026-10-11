@@ -1,0 +1,59 @@
+---
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: docker
+    steps:
+      - name: Checkout
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up toolchain
+        # mise pins Go, golangci-lint, and oxfmt in .mise/config.toml, so CI
+        # runs exactly the versions and tasks used locally.
+        uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          experimental: true
+          install_args: --locked
+
+      - name: Check Go formatting
+        run: mise run fmt-check
+
+      - name: Check non-Go formatting
+        run: mise run oxfmt-check
+
+      - name: Check module tidiness
+        run: mise run tidy-check
+
+      - name: Vet
+        run: mise run vet
+
+      - name: Lint
+        run: mise run lint
+
+  test:
+    name: Build and test
+    runs-on: docker
+    steps:
+      - name: Checkout
+        uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up toolchain
+        uses: https://github.com/jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          experimental: true
+          install_args: --locked
+
+      - name: Build
+        run: mise run build
+
+      - name: Run tests
+        run: mise run test

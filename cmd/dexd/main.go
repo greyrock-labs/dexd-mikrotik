@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ishioni/dexd/internal/config"
-	"github.com/ishioni/dexd/internal/controller"
-	appmetrics "github.com/ishioni/dexd/internal/metrics"
-	"github.com/ishioni/dexd/internal/provider/unifi"
-	"github.com/ishioni/dexd/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/controller"
+	appmetrics "github.com/greyrock-labs/dexd-mikrotik/internal/metrics"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // Build-time metadata populated by -ldflags "-X main.Version=… -X main.Gitsha=…".
@@ -59,8 +59,8 @@ func main() {
 		"gitsha", Gitsha,
 		"owner_id", cfg.OwnerID,
 		"txt_prefix", cfg.TxtPrefix,
-		"unifi_host", cfg.UnifiHost,
-		"unifi_site", cfg.UnifiSite,
+		"mikrotik_baseurl", cfg.MikrotikBaseURL,
+		"mikrotik_username", cfg.MikrotikUsername,
 		"default_target", cfg.DefaultTarget,
 		"default_ttl", cfg.DefaultTTL.String(),
 		"policy", cfg.Policy,
@@ -78,16 +78,21 @@ func main() {
 	}
 	defer dockerSrc.Close()
 
-	unifiClient := unifi.NewClient(
-		cfg.UnifiHost,
-		cfg.UnifiAPIKey,
-		cfg.UnifiSite,
-		cfg.UnifiInsecureSkipVerify,
+	mikrotikClient, err := mikrotik.NewClient(
+		cfg.MikrotikBaseURL,
+		cfg.MikrotikUsername,
+		cfg.MikrotikPassword,
+		cfg.MikrotikSkipTLSVerify,
+		cfg.MikrotikCACert,
 		cfg.DryRun,
 		int(cfg.DefaultTTL),
 	)
+	if err != nil {
+		slog.Error("failed to create mikrotik client", "err", err)
+		os.Exit(1)
+	}
 
-	ctrl := controller.New(dockerAdapter{dockerSrc}, unifiClient, cfg.OwnerID, cfg.TxtPrefix, cfg.Policy, cfg.ReconcileInterval)
+	ctrl := controller.New(dockerAdapter{dockerSrc}, mikrotikClient, cfg.OwnerID, cfg.TxtPrefix, cfg.Policy, cfg.ReconcileInterval)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
