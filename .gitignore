@@ -1,0 +1,17 @@
+# Build and test output
+/dexd
+/bin/
+cover.out
+coverage.out
+coverage.txt
+
+# Editor / OS files
+.DS_Store
+.idea/
+.vscode/
+Thumbs.db
+.claude/
+
+# Local configuration and tool caches
+.env
+.mise.local.toml

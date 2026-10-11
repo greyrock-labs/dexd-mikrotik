@@ -1,0 +1,159 @@
+# AGENTS.md — Progress log for future agents
+
+This file documents the implementation status, design decisions, known gaps, and
+suggested next steps. Update it as work progresses.
+
+## Status: v0.4 — native dexd ownership and labels (2026-07-20)
+
+The core pipeline is implemented and covered by an automated test suite (`go test -race ./...`). It supports A and CNAME records, container-level target/type defaults, per-Traefik-router target/type/skip overrides, strict UniFi HTTP contract tests that exercise the real UniFi client against an in-process API simulator, safe DNS change policies, Prometheus metrics on `/metrics`, and native `dexd` labels and TXT ownership.
+
+Two real-world bugs were caught during manual testing and are now regression-guarded by tests:
+
+- UniFi rejects TXT records that include a `ttl` field. Fix: `internal/provider/unifi/client.go` skips TTL when `RecordType == "TXT"`. Guard: `TestCreateTXT_OmitsTTL`.
+- UniFi's automatic TTL is represented by omitting `ttl` from A/CNAME request bodies. `DEFAULT_TTL=auto` is the default; set a positive integer to force a TTL.
+- UniFi rejects TXT values containing unquoted commas. Fix: `internal/registry/txt.go` wraps the encoded value in `"..."`, strips on decode. Guard: `TestEncodeTXT_IsQuoted` + `TestDecodeTXT_StripsQuotes`.
+- The breaking v0.4 identity cleanup accepts only `dexd.*` Docker labels and recognizes only native `dexd` TXT ownership records.
+
+The core pipeline:
+
+```
+Docker daemon → label parser → plan → UniFi static-DNS
+                                   ↕
+                            TXT ownership registry
+```
+
+### Files written
+
+| File                                            | Purpose                                                                             |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `cmd/dexd/main.go`                              | Entry point, signal handling, wiring                                                |
+| `internal/config/config.go`                     | Env-driven config with validation                                                   |
+| `internal/config/config_test.go`                | Config validation tests, including policy, default TTL, and reconcile interval      |
+| `internal/source/endpoint.go`                   | Shared `Endpoint` type                                                              |
+| `internal/source/traefik.go`                    | Extracts hostnames from Traefik labels                                              |
+| `internal/source/docker.go`                     | Lists containers, streams Docker events                                             |
+| `internal/provider/unifi/types.go`              | `DNSRecord` DTO matching UniFi wire format                                          |
+| `internal/provider/unifi/client.go`             | HTTP client for UniFi static-dns CRUD                                               |
+| `internal/provider/unifi/errors.go`             | Typed UniFi API/network/data errors                                                 |
+| `internal/provider/unifi/client_test.go`        | Strict UniFi API simulator tests via `httptest.NewServer`                           |
+| `internal/registry/txt.go`                      | Native dexd TXT ownership encode/decode                                             |
+| `internal/plan/plan.go`                         | Diffs desired vs current, produces Changes                                          |
+| `internal/controller/controller.go`             | Reconcile loop with event debounce + periodic ticker                                |
+| `internal/controller/types.go`                  | `Source` and `Provider` interfaces + domain `Event` type                            |
+| `internal/controller/controller_test.go`        | Reconcile tests with in-process fakes, policy coverage, and debounce test           |
+| `internal/controller/unifi_integration_test.go` | End-to-end fake source → real controller → real UniFi client → fake UniFi API tests |
+| `internal/metrics/metrics.go`                   | Prometheus collectors and `/metrics` handler                                        |
+| `internal/metrics/metrics_test.go`              | Metrics handler smoke test                                                          |
+| `Dockerfile`                                    | Multi-stage build → scratch final image                                             |
+| `docker-compose.yml`                            | Example deployment                                                                  |
+| `.env.example`                                  | Deployment env template; keep in sync with config and README                        |
+| `deploy/prometheusrule.yaml`                    | Prometheus Operator alerts for reconciliation and provider health                   |
+| `deploy/grafana-dashboard.json`                 | Importable Grafana dashboard for dexd operational metrics                           |
+| `Makefile`                                      | `make build / run / test / vet / docker-build / docker-run`                         |
+| `internal/source/traefik_test.go`               | Table tests for label → endpoint extraction                                         |
+| `internal/source/docker_test.go`                | Endpoints aggregation, name parsing, event filters                                  |
+| `internal/registry/txt_test.go`                 | TXT encode/decode round-trip + ownership tests                                      |
+| `internal/plan/plan_test.go`                    | Diff engine: create/update/delete/replace + safety guards                           |
+| `.mise/config.toml`                             | Pinned Go tooling and local/CI task definitions                                     |
+| `.lefthook.toml`                                | Shared Home Operations hooks plus pre-push race-tested suite                        |
+| `.github/workflows/*.yaml`                      | Pinned lint, test, release, release-please, Renovate, and stale automation          |
+
+### Tooling and automation
+
+- `mise` is the source of truth for the Go version and build, test, formatting, lint, module-tidiness, and GitHub Actions security-audit tasks. Run `mise tasks` to discover them and `mise run <task>` locally. Node.js is pinned as the runtime required by oxfmt. Docker builds receive the pinned Go version as the required `GO_VERSION` build argument through the mise tasks, Makefile targets, release workflow, and Compose configuration.
+- Lefthook imports the shared `home-operations/.github` hook policy and runs `mise run test` before pushes.
+- Release Please tracks releases from the existing `v0.3.1` tag (`81aaacf`), writes `CHANGELOG.md`, and uses unprefixed semantic tags such as `0.4.0`.
+- Renovate imports `local>home-operations/renovate-config`, forces minor-version bumps of the `go.mod` directive, groups it with the mise Go tool in one `Go toolchain` update, and uses the repository GitHub App credentials (`BOT_CLIENT_ID` and `BOT_APP_PRIVATE_KEY`). The same App credentials are required by Release Please.
+- GitHub Actions use pinned action SHAs, run on `master` (the repository's current default branch), audit workflows with Zizmor, publish signed multi-architecture GHCR images, and execute the stale-item policy.
+
+## Key design decisions
+
+- **Auth**: X-Api-Key PAT only (UniFi Network 9.0+). No username/password fallback to keep the surface small. Add it later if needed.
+- **Record type**: Inferred automatically from the resolved target — IPv4 → A, anything else → CNAME (AAAA explicitly out of scope). No `record-type` label exists; the target string is the single source of truth.
+- **Opt-in labels**: Only `dexd.enabled=true` is required. Hostname extraction reads Traefik router rules, but `traefik.enable=true` is not a gate.
+- **TXT ownership**: Optional global `TXT_PREFIX` env var (default `""`) is prepended to TXT record names. For example, with `TXT_PREFIX=talos.`, the companion TXT for `postgres.example.com` is `talos.a-postgres.example.com`; without a prefix it is `a-postgres.example.com`. `TXT_OWNER` defaults to `dexd` and scopes the records owned by an instance.
+- **Policy**: `POLICY` defaults to `sync`. `sync` applies creates, updates, replacements, stale deletes, and orphan TXT cleanup. `upsert-only` applies creates, updates, and owned A/CNAME replacements, but skips stale deletes and orphan TXT cleanup. `create-only` applies only creates.
+- **Metrics**: `METRICS_ADDR` defaults to `:8080` and exposes Prometheus metrics at `/metrics`. Set it to an empty string to disable the metrics HTTP server.
+- **Ownership safety**: Records without matching owner TXT are never deleted.
+- **Debounce**: Docker events are debounced 2s before triggering a reconcile to coalesce rapid restarts.
+
+## Label vocabulary
+
+Container-level defaults apply to all routers from the container:
+
+```yaml
+dexd.enabled: "true"
+dexd.target: "<ip-or-hostname>" # IPv4 → A, hostname → CNAME
+```
+
+Per-router overrides are matched by router name from `traefik.http.routers.<name>.rule`:
+
+```yaml
+dexd.routers.<name>.target: "<ip-or-hostname>"
+dexd.routers.<name>.hostnames: "<hostname>[,<hostname>...]" # replaces parsed Host() names
+dexd.routers.<name>.extra-hostnames: "<hostname>[,<hostname>...]" # appends to parsed Host() names
+dexd.routers.<name>.skip: "true"
+```
+
+Standalone host blocks create records that are not tied to Traefik router labels:
+
+```yaml
+dexd.hosts.<name>.hostnames: "<hostname>[,<hostname>...]"
+dexd.hosts.<name>.target: "<ip-or-hostname>"
+dexd.hosts.<name>.skip: "true"
+```
+
+Precedence per router: `skip=true` → `hostnames` override or parsed `Host()` names + `extra-hostnames` → per-router target → container-level target → global default (`DEFAULT_TARGET`). Precedence per standalone block: `skip=true` → `hostnames` → block target → container-level target → global default. Record type is auto-detected from whichever target wins.
+
+UniFi does not support wildcard CNAME records. The UniFi provider rejects `*.example.com` + `CNAME` as unsupported; the controller logs a warning, increments `dexd_provider_errors_total{type="unsupported"}`, skips that record, and continues applying supported records. Wildcard A records are supported, but their TXT ownership key encodes `*` as `wildcard-dexd` because UniFi rejects `*` in TXT hostnames.
+
+## Wire format reference
+
+UniFi endpoint: `POST /proxy/network/v2/api/site/{site}/static-dns`
+
+```json
+{ "key": "foo.example.com", "record_type": "A", "value": "10.1.2.241", "enabled": true }
+```
+
+TXT ownership value:
+
+```
+heritage=dexd,dexd/owner=dexd,dexd/resource=docker/myapp
+```
+
+The request shape is verified by the strict in-process UniFi API simulator in `internal/provider/unifi/client_test.go`.
+
+## Test coverage
+
+Run with `make test` or `go test -race ./...`. All tests use stdlib only (no testcontainers, no Docker daemon or real UniFi controller needed).
+
+| Package                    | What it covers                                                                                                                                                                                                                                                                                                              |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal/source`          | Label → endpoint extraction: `dexd.*` enable-flag gating and label vocabulary, standalone host blocks, single/multi `Host()`, `\|\|` joining, router hostname override/append labels, `HostRegexp` skip, unsubstituted `${VAR}` skip, multi-router merging, container/router target and record-type overrides, router skip. |
+| `internal/registry`        | `TXTKey` and `ParseTXTKey` formatting/parsing, `EncodeTXT` always quoted, `DecodeTXT` round-trip + quote stripping, rejects non-heritage values, `IsOwnedBy` cross-owner matrix.                                                                                                                                            |
+| `internal/plan`            | All Create/Update/Delete/Replace branches for A and CNAME plus the three safety rules: no update without our TXT, no update if TXT belongs to another owner, no delete without our TXT.                                                                                                                                     |
+| `internal/provider/unifi`  | HTTP wire format: list shape, `_id`, `X-Api-Key`, `Accept`, `Content-Type`, A/CNAME omit `ttl` for auto or include configured numeric TTL, **TXT omits `ttl`**, PUT/DELETE URLs, typed API/network/data errors, dry-run makes no mutation calls.                                                                            |
+| `internal/controller`      | Reconcile → apply flow: create/update/delete record+TXT pairs, CNAME pair creation, all three ownership safety rules, error-continues behaviour, debounce → reconcile event path, and integration tests through the real UniFi client against a strict fake UniFi API.                                                      |
+| `internal/metrics`         | Prometheus handler and metrics for reconcile health, plan/change counts, source events, provider requests, provider errors, and build/config info.                                                                                                                                                                          |
+| `internal/source` (docker) | Endpoints aggregation across multiple containers, name slash-stripping, ID fallback, list error propagation, event filter correctness, channel pass-through.                                                                                                                                                                |
+
+## Known gaps / future work
+
+- [x] **UniFi response validation**: strict tests now cover lower-case UniFi JSON fields, `_id` record IDs, request headers, TTL behavior, UniFi-style error JSON, invalid JSON, and controller flows through the real UniFi client.
+- [x] **Standalone non-Traefik hosts**: add explicit labels such as
+      `dexd.hosts.<name>.*` for endpoints that do not have Traefik
+      router rules.
+- [x] **Prometheus metrics**: `/metrics` exports reconcile totals/duration/last success, reconcile errors, plan gauges, change counters, source errors/events, provider request metrics, provider errors, build info, and the standard Go/process runtime collectors. `dexd_plan_desired_records{record_type}` is the unique desired A/CNAME record count by type plus their companion TXT ownership records; the exporter intentionally does not expose the complete UniFi static-DNS inventory.
+
+## Dependency notes
+
+- `github.com/docker/docker` — Docker SDK for Go; used for container listing and event streaming.
+- `github.com/caarlos0/env/v11` — Declarative environment variable parsing for config.
+- `github.com/prometheus/client_golang` — Prometheus collectors and HTTP handler.
+- No external HTTP client lib — uses stdlib `net/http`.
+- No external logging lib — uses stdlib `log/slog` (Go 1.21+).
+- Go 1.26+ required.
+
+## Maintenance notes
+
+- Keep `.env.example`, `README.md`, and `docker-compose.yml` in sync whenever environment variables or deployment-facing label examples change. Users are expected to copy `.env.example` for real deployments.

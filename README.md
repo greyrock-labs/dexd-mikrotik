@@ -1,0 +1,217 @@
+# dexd
+
+External DNS, but for Docker!
+
+`dexd` is a lightweight Go agent that watches your Docker daemon and
+automatically creates/removes static DNS records on a **UniFi OS local
+controller** (UDM/UDR/UDM-Pro) for services exposed via Traefik.
+
+It uses TXT ownership records so it can safely coexist with other DNS
+automation pointing at the same UniFi controller.
+
+## How it works
+
+1. Scans running containers opted in with `dexd.enabled=true`.
+2. Extracts hostnames from `traefik.http.routers.<name>.rule: Host(\`...\`)` labels.
+3. Creates an **A** or **CNAME** record and a companion **TXT ownership record**
+   on UniFi for each hostname.
+4. Listens for Docker lifecycle events (start/stop/remove) and reconciles on a
+   periodic interval — records are removed when containers disappear and new
+   ones appear within seconds.
+
+### Ownership safety
+
+For every managed record at `foo.example.com`, a TXT record is created at
+`{record_type}-foo.example.com` with value:
+
+```text
+heritage=dexd,dexd/owner=<TXT_OWNER>,dexd/resource=docker/<container-name>
+```
+
+Records **without** a matching ownership TXT are never touched — records
+created outside dexd are safe.
+
+## Deployment
+
+```yaml
+# .env
+UNIFI_HOST=https://10.1.2.1
+UNIFI_API_KEY=<PAT from UniFi Network settings>
+DEFAULT_TARGET=10.1.2.241
+```
+
+```bash
+docker compose up -d
+```
+
+## Configuration
+
+| Environment variable         | Default      | Description                                                                             |
+| ---------------------------- | ------------ | --------------------------------------------------------------------------------------- |
+| `UNIFI_HOST`                 | **required** | UniFi controller URL, e.g. `https://10.1.2.1`                                           |
+| `UNIFI_API_KEY`              | **required** | Personal Access Token from UniFi Network                                                |
+| `DEFAULT_TARGET`             | **required** | Default target. IPv4 → A record, hostname → CNAME                                       |
+| `UNIFI_SITE`                 | `default`    | UniFi site name                                                                         |
+| `UNIFI_INSECURE_SKIP_VERIFY` | `true`       | Skip TLS verification (self-signed certs)                                               |
+| `TXT_OWNER`                  | `dexd`       | Scopes TXT ownership; change if running multiple instances                              |
+| `TXT_PREFIX`                 | empty        | Optional prefix for ownership TXT record names                                          |
+| `POLICY`                     | `sync`       | Change policy: `sync`, `upsert-only`, or `create-only`                                  |
+| `DEFAULT_TTL`                | `auto`       | TTL for created A/CNAME records. Use `auto` to let UniFi choose, or a positive integer. |
+| `RECONCILE_INTERVAL`         | `5m`         | How often to run a full reconcile                                                       |
+| `LOG_LEVEL`                  | `info`       | `debug`, `info`, `warn`, or `error`                                                     |
+| `LOG_FORMAT`                 | `text`       | `text` or `json`                                                                        |
+| `DRY_RUN`                    | `false`      | List current UniFi records and log planned changes without mutating UniFi               |
+| `METRICS_ADDR`               | `:8080`      | Address for the Prometheus metrics HTTP server. Empty disables metrics.                 |
+
+### Policy
+
+`POLICY` controls which planned changes are applied:
+
+| Policy        | Creates | Updates | A/CNAME replacements | Deletes                               |
+| ------------- | ------- | ------- | -------------------- | ------------------------------------- |
+| `sync`        | yes     | yes     | yes                  | yes                                   |
+| `upsert-only` | yes     | yes     | yes                  | no stale-record or orphan-TXT cleanup |
+| `create-only` | yes     | no      | no                   | no                                    |
+
+`upsert-only` allows A/CNAME replacements because they are updates by intent. UniFi may require deleting the old owned record before creating the replacement record with the same hostname.
+
+## Metrics
+
+Prometheus metrics are exposed at `/metrics` on `METRICS_ADDR`. The example
+Docker Compose file publishes the default metrics listener on host port `8080`.
+
+Useful alerting metrics:
+
+```promql
+time() - dexd_reconcile_last_success_timestamp_seconds > 900
+increase(dexd_reconcile_total{result="error"}[10m]) > 0
+increase(dexd_changes_total{result="error"}[10m]) > 0
+increase(dexd_provider_errors_total[10m]) > 0
+```
+
+`deploy/prometheusrule.yaml` includes alerts for stale successful reconciles, source/reconcile/change/provider errors, and slow reconciles. Apply it in clusters using the Prometheus Operator.
+
+Import [`deploy/grafana-dashboard.json`](deploy/grafana-dashboard.json) into Grafana to monitor reconciliation health, managed DNS records, plans and applied DNS changes, Docker events, UniFi provider requests/latency, errors, build information, and the Go process runtime. The dashboard includes datasource, `job`, and `instance` variables so it works with any Prometheus scrape configuration. **Managed UniFi Records** counts the desired A/CNAME records and their companion TXT ownership records, broken down by `record_type`; it does not expose the complete UniFi static-DNS inventory.
+
+Useful dashboard metrics:
+
+- `dexd_reconcile_total`
+- `dexd_reconcile_duration_seconds`
+- `dexd_reconcile_last_success_timestamp_seconds`
+- `dexd_plan_desired_records{record_type}`
+- `dexd_plan_changes`
+- `dexd_changes_total`
+- `dexd_provider_requests_total`
+- `dexd_provider_request_duration_seconds`
+- `dexd_provider_errors_total`
+- `dexd_docker_events_total`
+- `process_cpu_seconds_total`
+- `process_resident_memory_bytes`
+- `go_memstats_heap_alloc_bytes`
+- `go_goroutines`
+- `go_threads`
+
+## Container labels
+
+Add `dexd.enabled=true` to any service you want managed:
+
+```yaml
+labels:
+  dexd.enabled: "true"
+  traefik.http.routers.myapp.rule: Host(`myapp.example.com`)
+  # ... other traefik labels
+```
+
+Multiple hosts in a single rule are all created:
+
+```yaml
+traefik.http.routers.myapp.rule: Host(`foo.example.com`) || Host(`bar.example.com`)
+```
+
+`HostRegexp(...)` entries are skipped — they cannot be materialized into DNS records.
+
+### Record type detection
+
+Record type is inferred automatically from the target value: an **IPv4 address** produces an **A record**, and a **hostname** produces a **CNAME**. There is no `record-type` label — the target string is the single source of truth.
+
+A container-level target override applies to every router from that container:
+
+```yaml
+labels:
+  dexd.enabled: "true"
+  dexd.target: "traefik.example.com" # hostname → CNAME for all routers
+```
+
+Per-router target overrides take precedence, and each router's type is detected independently:
+
+```yaml
+labels:
+  dexd.enabled: "true"
+  traefik.http.routers.s3.rule: Host(`bucket.example.com`)
+  traefik.http.routers.console.rule: Host(`console.example.com`)
+  dexd.routers.console.target: "traefik.example.com"
+  # bucket.example.com → A (uses DEFAULT_TARGET, an IP)
+  # console.example.com → CNAME (hostname override)
+```
+
+Per-router hostname overrides can replace or extend hostnames parsed from
+Traefik `Host(...)` rules:
+
+```yaml
+labels:
+  dexd.enabled: "true"
+  traefik.http.routers.rustfs.rule: Host(`${S3_HOST}`) || HostRegexp(`^.+\.${S3_HOST}$`)
+  dexd.routers.rustfs.extra-hostnames: "*.${S3_HOST}"
+```
+
+Use `dexd.routers.<name>.hostnames` to replace parsed hostnames entirely, or
+`dexd.routers.<name>.extra-hostnames` to append comma-separated names. Router
+`skip=true` wins over hostnames, extra hostnames, and target overrides.
+
+Standalone host blocks create records that are not tied to Traefik router
+labels:
+
+```yaml
+labels:
+  dexd.enabled: "true"
+  dexd.hosts.dashboard.hostnames: "traefik.${DOMAIN}"
+  dexd.hosts.dashboard.target: "10.1.2.241"
+```
+
+`dexd.hosts.<name>.target` is optional and falls back to container-level
+`dexd.target`, then `DEFAULT_TARGET`. `dexd.hosts.<name>.skip=true` skips the
+whole standalone block, including all configured hostnames.
+
+UniFi does not support wildcard CNAME records. If a hostname such as
+`*.example.com` resolves to a CNAME target, `dexd` logs a warning, increments
+the provider error metric with `type="unsupported"`, skips that record, and
+continues applying supported records. Wildcard A records are supported; their
+ownership TXT record replaces the `*` label with `wildcard-dexd` so UniFi
+accepts the TXT hostname.
+
+### Native ownership and labels
+
+`dexd` accepts only `dexd.*` labels and writes native `dexd` ownership TXT
+records. Records created by versions before this breaking change are not
+considered owned and must be removed or migrated manually before using
+`POLICY=sync`.
+
+## Getting a UniFi PAT
+
+In UniFi Network, go to **Settings → Admins & Users → [your admin] → API Access**
+and create a new Personal Access Token. UniFi Network 9.0+ is required for PAT
+support.
+
+## Building
+
+```bash
+go build ./cmd/dexd
+```
+
+or with Docker, using the Go version pinned by mise:
+
+```bash
+mise run docker-build
+```
+
+The equivalent Make target is `make docker-build`.
