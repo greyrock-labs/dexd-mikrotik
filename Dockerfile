@@ -6,7 +6,7 @@
 # Runs on the build platform and cross-compiles for the target. The final
 # stage is `scratch` with no RUN steps, so multi-arch images need no QEMU --
 # which the Forgejo runner cannot provide (it cannot mount binfmt_misc).
-FROM --platform=$BUILDPLATFORM golang:1.27.2-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG VERSION=dev
