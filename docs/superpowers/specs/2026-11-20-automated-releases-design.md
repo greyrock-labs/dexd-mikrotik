@@ -118,8 +118,8 @@ because repo rules apply after presets:
   repository and issue write scopes, is the repo secret `RELEASE_BOT_TOKEN`.
   Forgejo doesn't start workflows from actions taken with the built-in token,
   so the PR branch and the tag come from this account.
-- `GH_RELEASE_TOKEN`: a GitHub token that can create releases on the mirror.
-- `GHCR_TOKEN`: a GitHub token with `write:packages` for pushing images.
+- `GHCR_TOKEN`: a classic GitHub token with `write:packages` and `public_repo`,
+  used both for pushing images and for creating releases on the mirror.
 
 ## Image signing
 
