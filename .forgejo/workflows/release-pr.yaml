@@ -1,6 +1,6 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-name: Release PR
+name: Prepare release
 
 # Keeps a "chore(release): vX.Y.Z" pull request open whenever something
 # releasable has landed on main. Merging it is what ships a release. Run it by

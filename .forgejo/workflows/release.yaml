@@ -1,13 +1,17 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
-name: Release
+name: Publish release
 
 # Ships the version at the top of CHANGELOG.md once the release pull request
-# that added it is merged. Every other push to main stops at the check job.
+# that added it is merged. Only that merge changes CHANGELOG.md, so ordinary
+# pushes don't start this workflow. Run it by hand to retry a failed release.
 on:
   push:
     branches:
       - main
+    paths:
+      - CHANGELOG.md
+  workflow_dispatch:
 
 concurrency:
   group: release

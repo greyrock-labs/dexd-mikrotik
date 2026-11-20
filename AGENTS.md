@@ -48,7 +48,7 @@ router and cleans up after itself. CI never runs it.
 
 Releases go through a release pull request, never through hand-made tags.
 
-- `.forgejo/workflows/release-pr.yaml` runs on every push to `main`. If any
+- `.forgejo/workflows/release-pr.yaml` ("Prepare release") runs on every push to `main`. If any
   releasable commits have landed since the last `v*` tag, the `keymaker` bot
   force-pushes `release/next` with an updated `CHANGELOG.md` and keeps one PR
   open, titled `chore(release): vX.Y.Z`, with the release notes as its body.
@@ -56,7 +56,8 @@ Releases go through a release pull request, never through hand-made tags.
   (`workflow_dispatch`) releases at least a patch even when nothing
   releasable is pending.
 - Merging that PR is the decision to release. `.forgejo/workflows/release.yaml`
-  sees an untagged version at the top of `CHANGELOG.md`, runs the tests, builds
+  ("Publish release") runs only when `CHANGELOG.md` changes on `main`, or by
+  hand to retry a failed release. It sees an untagged version at the top of `CHANGELOG.md`, runs the tests, builds
   `linux/amd64,linux/arm64`, pushes exactly `X.Y.Z` and `latest` to
   `ghcr.io/greyrock-labs/dexd-mikrotik`, signs the digest with cosign, tags the
   commit `vX.Y.Z`, and publishes the notes as a Forgejo release and a GitHub

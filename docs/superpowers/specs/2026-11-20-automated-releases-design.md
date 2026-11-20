@@ -71,7 +71,7 @@ Conventional commits since the last `v*` tag reachable from `main`:
 
 - `test.yaml` and `lint.yaml`: unchanged. Test runs on PRs and pushes to
   `main`, so the release PR gets the same checks as any PR.
-- `release-pr.yaml` (new), on push to `main` and `workflow_dispatch`:
+- `release-pr.yaml` ("Prepare release", new), on push to `main` and `workflow_dispatch`:
   - Computes the next version with git-cliff. If nothing releasable is pending
     and the run wasn't dispatched, it closes any open release PR and stops.
   - Otherwise it regenerates `CHANGELOG.md` and commits it to the
@@ -82,7 +82,8 @@ Conventional commits since the last `v*` tag reachable from `main`:
   - `workflow_dispatch` forces at least a patch bump. This covers releasing
     when only non-releasable commits are pending, as with the first automated
     release.
-- `release.yaml` (rewritten), on push to `main`:
+- `release.yaml` ("Publish release", rewritten), on pushes to `main` that
+  change `CHANGELOG.md`, and `workflow_dispatch` to retry:
   - Reads the top version from `CHANGELOG.md`. If tag `vX.Y.Z` already exists,
     it stops. This works whatever merge style the PR used.
   - Runs the tests, then builds `linux/amd64,linux/arm64` and pushes `X.Y.Z`
