@@ -24,8 +24,9 @@ status() {
 call() {
   local method="$1" url="$2"
   shift 2
-  curl -fsS -X "$method" -H "Authorization: token $RELEASE_BOT_TOKEN" \
-    -H "Content-Type: application/json" "$url" "$@"
+  curl -sS --fail-with-body -X "$method" -H "Authorization: token $RELEASE_BOT_TOKEN" \
+    -H "Content-Type: application/json" "$url" "$@" \
+    || { echo "Forgejo API call failed: $method $url" >&2; return 1; }
 }
 
 if [[ "$(status "$repo_api/tags/$version")" == "404" ]]; then

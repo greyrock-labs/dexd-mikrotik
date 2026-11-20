@@ -3,10 +3,12 @@
 # step with main. With nothing releasable it closes the PR. --force releases
 # at least a patch even when nothing releasable is pending.
 #
-# Needs FORGEJO_SERVER_URL, FORGEJO_REPOSITORY and RELEASE_BOT_TOKEN.
+# Needs FORGEJO_SERVER_URL, FORGEJO_REPOSITORY, RELEASE_BOT_TOKEN, and the bot's
+# RELEASE_BOT_NAME and RELEASE_BOT_EMAIL for the release commit.
 set -euo pipefail
 
 : "${FORGEJO_SERVER_URL:?}" "${FORGEJO_REPOSITORY:?}" "${RELEASE_BOT_TOKEN:?}"
+: "${RELEASE_BOT_NAME:?}" "${RELEASE_BOT_EMAIL:?}"
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 api="$FORGEJO_SERVER_URL/api/v1"
@@ -16,8 +18,9 @@ branch="release/next"
 call() {
   local method="$1" url="$2"
   shift 2
-  curl -fsS -X "$method" -H "Authorization: token $RELEASE_BOT_TOKEN" \
-    -H "Content-Type: application/json" "$url" "$@"
+  curl -sS --fail-with-body -X "$method" -H "Authorization: token $RELEASE_BOT_TOKEN" \
+    -H "Content-Type: application/json" "$url" "$@" \
+    || { echo "Forgejo API call failed: $method $url" >&2; return 1; }
 }
 
 # A merged release PR leaves an untagged version at the top of CHANGELOG.md
@@ -41,19 +44,15 @@ if [[ -z "$version" ]]; then
   exit 0
 fi
 
-bot="$(call GET "$api/user")"
-bot_name="$(jq -r .login <<<"$bot")"
-bot_email="$(jq -r .email <<<"$bot")"
-
 git switch -q -C "$branch"
 "$here/update-changelog.sh" "$version"
 git add CHANGELOG.md
-git -c user.name="$bot_name" -c user.email="$bot_email" -c commit.gpgsign=false \
+git -c user.name="$RELEASE_BOT_NAME" -c user.email="$RELEASE_BOT_EMAIL" -c commit.gpgsign=false \
   commit -q -m "chore(release): $version"
 
 scheme="${FORGEJO_SERVER_URL%%://*}"
 host="${FORGEJO_SERVER_URL#*://}"
-git push -q --force "$scheme://$bot_name:$RELEASE_BOT_TOKEN@$host/$FORGEJO_REPOSITORY.git" \
+git push -q --force "$scheme://$RELEASE_BOT_NAME:$RELEASE_BOT_TOKEN@$host/$FORGEJO_REPOSITORY.git" \
   "HEAD:refs/heads/$branch"
 
 notes="$("$here/release-version.sh" notes)"

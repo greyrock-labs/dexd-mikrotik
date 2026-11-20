@@ -83,7 +83,9 @@ The scripts behind this live in `.forgejo/scripts/`, and
 (the `keymaker` Forgejo token, with repository and issue write),
 `GHCR_TOKEN` (a GitHub classic PAT with `write:packages` and `public_repo`, used
 for image pushes and GitHub releases), and `COSIGN_PRIVATE_KEY` plus
-`COSIGN_PASSWORD` (signing key; the public half is `cosign.pub`). Images carry
+`COSIGN_PASSWORD` (signing key; the public half is `cosign.pub`). Repo
+variables `RELEASE_BOT_NAME` and `RELEASE_BOT_EMAIL` set the release commit's
+author. Images carry
 an SBOM but no provenance attestation. Pull requests run tests and lint via
 `.forgejo/workflows/test.yaml` and `lint.yaml`.
 
