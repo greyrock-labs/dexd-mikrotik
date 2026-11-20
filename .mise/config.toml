@@ -46,6 +46,10 @@ run = "golangci-lint run"
 description = "Verify go.mod and go.sum are tidy"
 run = "go mod tidy && git diff --exit-code go.mod go.sum"
 
+[tasks.release-scripts-test]
+description = "Test the release version and changelog scripts"
+run = "bash .forgejo/scripts/test-release-scripts.sh"
+
 [tasks.dev]
 description = "Run dexd-mikrotik locally (reads .env when present)"
 run = "go run ./cmd/dexd-mikrotik"
