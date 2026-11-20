@@ -9,11 +9,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/doonga/dexd-mikrotik/internal/config"
-	"github.com/doonga/dexd-mikrotik/internal/controller"
-	appmetrics "github.com/doonga/dexd-mikrotik/internal/metrics"
-	"github.com/doonga/dexd-mikrotik/internal/provider/mikrotik"
-	"github.com/doonga/dexd-mikrotik/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/controller"
+	appmetrics "github.com/greyrock-labs/dexd-mikrotik/internal/metrics"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // Build-time metadata populated by -ldflags "-X main.Version=… -X main.Gitsha=…".

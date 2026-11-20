@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/doonga/dexd-mikrotik/internal/dns"
-	appmetrics "github.com/doonga/dexd-mikrotik/internal/metrics"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/dns"
+	appmetrics "github.com/greyrock-labs/dexd-mikrotik/internal/metrics"
 )
 
 // Comment marks records owned by this controller.

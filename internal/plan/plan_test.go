@@ -4,9 +4,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/doonga/dexd-mikrotik/internal/dns"
-	"github.com/doonga/dexd-mikrotik/internal/registry"
-	"github.com/doonga/dexd-mikrotik/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/dns"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/registry"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 const ownerID = "us"

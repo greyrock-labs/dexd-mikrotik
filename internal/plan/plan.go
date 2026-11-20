@@ -9,9 +9,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/doonga/dexd-mikrotik/internal/dns"
-	"github.com/doonga/dexd-mikrotik/internal/registry"
-	"github.com/doonga/dexd-mikrotik/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/dns"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/registry"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // Changes holds the buckets of DNS work to perform.

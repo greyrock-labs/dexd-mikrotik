@@ -7,7 +7,7 @@ their Traefik `Host()` rules, and reconciles A/CNAME records into MikroTik
 RouterOS 7 static DNS over the REST API (`www-ssl`). Ownership is recorded in
 companion TXT entries so it can share a router with external-dns.
 
-Go module: `github.com/doonga/dexd-mikrotik`. Image: `ghcr.io/doonga/dexd-mikrotik`.
+Go module: `github.com/greyrock-labs/dexd-mikrotik`. Image: `ghcr.io/greyrock-labs/dexd-mikrotik`.
 
 ## Layout
 
@@ -47,7 +47,7 @@ router and cleans up after itself. CI never runs it.
 ## Release process
 
 `.forgejo/workflows/release.yaml` publishes the image to GHCR. Pushes to `main`
-publish `ghcr.io/doonga/dexd-mikrotik:main` and `:sha-<short>`. A hand-cut
+publish `ghcr.io/greyrock-labs/dexd-mikrotik:main` and `:sha-<short>`. A hand-cut
 signed tag publishes `X.Y.Z`, `X.Y` and `latest`:
 
 ```bash

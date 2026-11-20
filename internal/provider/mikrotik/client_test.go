@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/doonga/dexd-mikrotik/internal/dns"
-	"github.com/doonga/dexd-mikrotik/internal/provider/mikrotik/mikrotiktest"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/dns"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik/mikrotiktest"
 )
 
 func newTestClient(t *testing.T, mut func(*Options)) (*Client, *mikrotiktest.Sim) {

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/doonga/dexd-mikrotik/internal/config"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )

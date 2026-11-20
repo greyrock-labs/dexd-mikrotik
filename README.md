@@ -87,7 +87,7 @@ DEFAULT_TARGET=192.0.2.10
 docker compose up -d
 ```
 
-The image is `ghcr.io/doonga/dexd-mikrotik:latest`. The Compose file mounts the
+The image is `ghcr.io/greyrock-labs/dexd-mikrotik:latest`. The Compose file mounts the
 Docker socket read-only.
 
 ## Configuration

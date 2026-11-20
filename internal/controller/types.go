@@ -3,8 +3,8 @@ package controller
 import (
 	"context"
 
-	"github.com/doonga/dexd-mikrotik/internal/dns"
-	"github.com/doonga/dexd-mikrotik/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/dns"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // Event is a lightweight, source-agnostic notification that desired

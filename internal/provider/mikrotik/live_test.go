@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/doonga/dexd-mikrotik/internal/dns"
-	"github.com/doonga/dexd-mikrotik/internal/registry"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/dns"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/registry"
 )
 
 // TestLive_RoundTrip exercises a real RouterOS 7 router. It is skipped unless

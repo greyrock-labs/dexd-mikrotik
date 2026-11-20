@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/doonga/dexd-mikrotik/internal/config"
-	"github.com/doonga/dexd-mikrotik/internal/provider/mikrotik"
-	"github.com/doonga/dexd-mikrotik/internal/provider/mikrotik/mikrotiktest"
-	"github.com/doonga/dexd-mikrotik/internal/registry"
-	"github.com/doonga/dexd-mikrotik/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/provider/mikrotik/mikrotiktest"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/registry"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 func newSimProvider(t *testing.T, sim *mikrotiktest.Sim) *mikrotik.Client {

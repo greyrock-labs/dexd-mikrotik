@@ -3,7 +3,7 @@
 # Deploy this alongside Traefik on your Docker host.
 services:
   dexd-mikrotik:
-    image: ghcr.io/doonga/dexd-mikrotik:latest
+    image: ghcr.io/greyrock-labs/dexd-mikrotik:latest
     container_name: dexd-mikrotik
     restart: unless-stopped
     environment:

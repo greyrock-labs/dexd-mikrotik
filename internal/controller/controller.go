@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/doonga/dexd-mikrotik/internal/config"
-	"github.com/doonga/dexd-mikrotik/internal/dns"
-	appmetrics "github.com/doonga/dexd-mikrotik/internal/metrics"
-	"github.com/doonga/dexd-mikrotik/internal/plan"
-	"github.com/doonga/dexd-mikrotik/internal/registry"
-	"github.com/doonga/dexd-mikrotik/internal/source"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/dns"
+	appmetrics "github.com/greyrock-labs/dexd-mikrotik/internal/metrics"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/plan"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/registry"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/source"
 )
 
 // Controller orchestrates the reconcile loop.

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/doonga/dexd-mikrotik/internal/config"
+	"github.com/greyrock-labs/dexd-mikrotik/internal/config"
 )
 
 func TestHandlerExportsMetrics(t *testing.T) {
