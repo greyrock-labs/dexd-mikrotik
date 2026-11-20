@@ -2,6 +2,7 @@
 # the same build, test, lint, and image commands used by CI.
 
 [tools]
+actionlint = "1.7.12"
 cosign = "3.1.4"
 git-cliff = "2.14.2"
 go = "1.27.4"
@@ -45,6 +46,10 @@ run = "golangci-lint run"
 [tasks.tidy-check]
 description = "Verify go.mod and go.sum are tidy"
 run = "go mod tidy && git diff --exit-code go.mod go.sum"
+
+[tasks.actionlint]
+description = "Lint the Forgejo workflows"
+run = "actionlint -config-file .forgejo/actionlint.yaml .forgejo/workflows/*.yaml"
 
 [tasks.release-scripts-test]
 description = "Test the release version and changelog scripts"

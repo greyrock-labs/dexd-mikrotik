@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # release-pr.sh [--force] keeps the release/next branch and its pull request in
-# step with main. With nothing releasable it closes the PR. --force releases
-# at least a patch even when nothing releasable is pending.
+# step with main. An open release PR stays open and is refreshed; only a person
+# closes it. Without one, a PR opens only when something releasable is pending,
+# or with --force, which releases at least a patch regardless.
 #
 # Needs FORGEJO_SERVER_URL, FORGEJO_REPOSITORY and RELEASE_BOT_TOKEN. The token
 # needs read:user so the release commit can carry the bot's own name and email.
@@ -29,17 +30,17 @@ if "$here/release-version.sh" pending; then
   exit 0
 fi
 
-version="$("$here/next-version.sh" "$@")"
 pr="$(call GET "$repo_api/pulls?state=open&limit=50" \
   | jq -r --arg b "$branch" '[.[] | select(.head.ref == $b)][0].number // empty')"
 
+force=()
+if [[ "${1:-}" == "--force" || -n "$pr" ]]; then
+  force=(--force)
+fi
+version="$("$here/next-version.sh" "${force[@]}")"
+
 if [[ -z "$version" ]]; then
   echo "Nothing releasable since the last version tag."
-  if [[ -n "$pr" ]]; then
-    call PATCH "$repo_api/pulls/$pr" -d '{"state":"closed"}' >/dev/null
-    echo "Closed release PR #$pr."
-  fi
-  call DELETE "$repo_api/branches/$branch" >/dev/null 2>&1 || true
   exit 0
 fi
 

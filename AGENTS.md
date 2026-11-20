@@ -52,9 +52,9 @@ Releases go through a release pull request, never through hand-made tags.
   releasable commits have landed since the last `v*` tag, the `keymaker` bot
   force-pushes `release/next` with an updated `CHANGELOG.md` and keeps one PR
   open, titled `chore(release): vX.Y.Z`, with the release notes as its body.
-  If nothing is releasable, it closes that PR. Running the workflow by hand
-  (`workflow_dispatch`) releases at least a patch even when nothing
-  releasable is pending.
+  An open release PR stays open and is refreshed on every push; only a person
+  closes it. Running the workflow by hand (`workflow_dispatch`) opens one for
+  at least a patch even when nothing releasable is pending.
 - Merging that PR is the decision to release. `.forgejo/workflows/release.yaml`
   ("Publish release") runs only when `CHANGELOG.md` changes on `main`, or by
   hand to retry a failed release. It sees an untagged version at the top of `CHANGELOG.md`, runs the tests, builds

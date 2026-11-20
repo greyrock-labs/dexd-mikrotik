@@ -72,8 +72,10 @@ Conventional commits since the last `v*` tag reachable from `main`:
 - `test.yaml` and `lint.yaml`: unchanged. Test runs on PRs and pushes to
   `main`, so the release PR gets the same checks as any PR.
 - `release-pr.yaml` ("Prepare release", new), on push to `main` and `workflow_dispatch`:
-  - Computes the next version with git-cliff. If nothing releasable is pending
-    and the run wasn't dispatched, it closes any open release PR and stops.
+  - Computes the next version with git-cliff. If nothing releasable is pending,
+    no release PR is open and the run wasn't dispatched, it stops. An open
+    release PR is never closed automatically: it is refreshed (at least a
+    patch) until someone merges or closes it.
   - Otherwise it regenerates `CHANGELOG.md` and commits it to the
     `release/next` branch as `chore(release): vX.Y.Z`. The branch is rebuilt
     from `main` each time and force-pushed. It then opens or updates the PR
