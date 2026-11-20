@@ -46,20 +46,44 @@ router and cleans up after itself. CI never runs it.
 
 ## Release process
 
-`.forgejo/workflows/release.yaml` publishes the image to GHCR. Pushes to `main`
-publish `ghcr.io/greyrock-labs/dexd-mikrotik:main` and `:sha-<short>`. A hand-cut
-signed tag publishes `X.Y.Z`, `X.Y` and `latest`:
+Releases go through a release pull request, never through hand-made tags.
 
-```bash
-git tag -s vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z
-```
+- `.forgejo/workflows/release-pr.yaml` runs on every push to `main`. If any
+  releasable commits have landed since the last `v*` tag, the `keymaker` bot
+  force-pushes `release/next` with an updated `CHANGELOG.md` and keeps one PR
+  open, titled `chore(release): vX.Y.Z`, with the release notes as its body.
+  If nothing is releasable, it closes that PR. Running the workflow by hand
+  (`workflow_dispatch`) releases at least a patch even when nothing
+  releasable is pending.
+- Merging that PR is the decision to release. `.forgejo/workflows/release.yaml`
+  sees an untagged version at the top of `CHANGELOG.md`, runs the tests, builds
+  `linux/amd64,linux/arm64`, pushes exactly `X.Y.Z` and `latest` to
+  `ghcr.io/greyrock-labs/dexd-mikrotik`, signs the digest with cosign, tags the
+  commit `vX.Y.Z`, and publishes the notes as a Forgejo release and a GitHub
+  release on the mirror. Every step can be re-run safely.
+- Pushes to `main` publish no images. There are no `:main`, `:sha-*` or `X.Y`
+  tags.
 
-Only `v*` tags produce versioned tags and `latest`; `main` never does. A
-pre-release tag such as `vX.Y.Z-rc.1` publishes only `X.Y.Z-rc.1` (no `X.Y`, no
-`latest`). Images carry an SBOM but no provenance attestation. Cut
-`v0.1.0` only after the live RouterOS test passes. The
-workflow needs the repo secret `GHCR_TOKEN`, a GitHub classic PAT with
-`write:packages`. Pull requests run tests and lint via
+Versions come from conventional commits (git-cliff, `cliff.toml`):
+
+| Commit                                                             | Release |
+| ------------------------------------------------------------------ | ------- |
+| breaking change (`feat!:` or `BREAKING CHANGE:`)                   | major   |
+| `feat:`                                                            | minor   |
+| `fix:`, `perf:`, `fix(deps):`                                      | patch   |
+| `chore:`, `ci:`, `docs:`, `test:`, `build:`, `refactor:`, `style:` | none    |
+
+Renovate extends the shared preset but overrides its commit types in
+`.renovaterc.json5`. Go modules and the Go toolchain are `fix(deps)`, which
+releases a patch. Everything else is `chore` and never carries `!`.
+
+The scripts behind this live in `.forgejo/scripts/`, and
+`mise run release-scripts-test` tests them. Repo secrets: `RELEASE_BOT_TOKEN`
+(the `keymaker` Forgejo token, with repository and issue write),
+`GHCR_TOKEN` (a GitHub classic PAT with `write:packages` and `public_repo`, used
+for image pushes and GitHub releases), and `COSIGN_PRIVATE_KEY` plus
+`COSIGN_PASSWORD` (signing key; the public half is `cosign.pub`). Images carry
+an SBOM but no provenance attestation. Pull requests run tests and lint via
 `.forgejo/workflows/test.yaml` and `lint.yaml`.
 
 ## Safety invariants

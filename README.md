@@ -87,8 +87,24 @@ DEFAULT_TARGET=192.0.2.10
 docker compose up -d
 ```
 
-The image is `ghcr.io/greyrock-labs/dexd-mikrotik:latest`. The Compose file mounts the
-Docker socket read-only.
+The Compose file mounts the Docker socket read-only.
+
+### Images
+
+Images are published to `ghcr.io/greyrock-labs/dexd-mikrotik` for `linux/amd64` and
+`linux/arm64`, tagged with the exact version (`1.0.2`) and `latest`. Version tags never
+change once published, so pin one, ideally with its digest, and let Renovate propose
+updates. Version numbers follow semver: a patch release only fixes things or updates
+dependencies, a minor release adds features, and a major release may need configuration
+changes. Release notes are on the GitHub releases page.
+
+Images are signed with cosign. To verify one:
+
+```bash
+cosign verify \
+  --key https://raw.githubusercontent.com/greyrock-labs/dexd-mikrotik/main/cosign.pub \
+  ghcr.io/greyrock-labs/dexd-mikrotik:1.0.2
+```
 
 ## Configuration
 
