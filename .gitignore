@@ -15,3 +15,6 @@ Thumbs.db
 # Local configuration and tool caches
 .env
 .mise.local.toml
+
+# Image signing private key: lives only in the Forgejo secret and a password manager.
+cosign.key
