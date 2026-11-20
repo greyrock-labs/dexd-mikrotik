@@ -80,7 +80,7 @@ func (c *Client) ValidateRecord(r dns.Record) error {
 		return &UnsupportedRecordError{
 			Name:       r.Name,
 			RecordType: r.Type,
-			Reason:     "RouterOS static names do not support * wildcards; use a concrete hostname",
+			Reason:     "wildcard hostnames are not supported; use a concrete hostname",
 		}
 	}
 	switch r.Type {

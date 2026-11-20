@@ -11,38 +11,10 @@ func TestTXTKey(t *testing.T) {
 		{"", "CNAME", "x.y.z", "cname-x.y.z"},
 		{"userprefix.", "A", "db.example.com", "userprefix.a-db.example.com"},
 		{"userprefix.", "CNAME", "app.example.com", "userprefix.cname-app.example.com"},
-		{"leo.", "A", "*.rs3.example.com", "leo.a-wildcard-dexd-mikrotik.rs3.example.com"},
 	}
 	for _, c := range cases {
 		if got := TXTKey(c.prefix, c.recordType, c.dnsName); got != c.want {
 			t.Errorf("TXTKey(%q, %q, %q) = %q, want %q", c.prefix, c.recordType, c.dnsName, got, c.want)
-		}
-	}
-}
-
-func TestHostnameFromTXTKey(t *testing.T) {
-	cases := []struct {
-		prefix, recordType, txtKey string
-		wantHostname               string
-		wantOK                     bool
-	}{
-		{"", "A", "a-foo.example.com", "foo.example.com", true},
-		{"userprefix.", "A", "userprefix.a-db.example.com", "db.example.com", true},
-		{"userprefix.", "CNAME", "userprefix.cname-app.example.com", "app.example.com", true},
-		{"leo.", "A", "leo.a-wildcard-dexd-mikrotik.rs3.example.com", "*.rs3.example.com", true},
-		// key doesn't carry the expected prefix — only ok matters
-		{"userprefix.", "A", "a-foo.example.com", "", false},
-		{"", "A", "userprefix.a-foo.example.com", "", false},
-	}
-	for _, c := range cases {
-		got, ok := HostnameFromTXTKey(c.prefix, c.recordType, c.txtKey)
-		if ok != c.wantOK {
-			t.Errorf("HostnameFromTXTKey(%q, %q, %q) ok=%v, want %v",
-				c.prefix, c.recordType, c.txtKey, ok, c.wantOK)
-		}
-		if ok && got != c.wantHostname {
-			t.Errorf("HostnameFromTXTKey(%q, %q, %q) = %q, want %q",
-				c.prefix, c.recordType, c.txtKey, got, c.wantHostname)
 		}
 	}
 }
@@ -82,14 +54,6 @@ func TestParseTXTKey(t *testing.T) {
 			txtKey:   "talos.cname-foo.example.com",
 			wantType: "CNAME",
 			wantHost: "foo.example.com",
-			wantOK:   true,
-		},
-		{
-			name:     "wildcard A with prefix",
-			prefix:   "leo.",
-			txtKey:   "leo.a-wildcard-dexd-mikrotik.rs3.example.com",
-			wantType: "A",
-			wantHost: "*.rs3.example.com",
 			wantOK:   true,
 		},
 		{
@@ -148,17 +112,6 @@ func TestDecodeTXT_RejectsForeignHeritage(t *testing.T) {
 		if _, ok := DecodeTXT(c); ok {
 			t.Errorf("DecodeTXT(%q) ok=true, want false", c)
 		}
-	}
-}
-
-func TestTXTKey_Wildcard(t *testing.T) {
-	key := TXTKey("", "A", "*.example.com")
-	if key != "a-wildcard-dexd-mikrotik.example.com" {
-		t.Fatalf("TXTKey = %q, want %q", key, "a-wildcard-dexd-mikrotik.example.com")
-	}
-	recordType, hostname, ok := ParseTXTKey("", key)
-	if !ok || recordType != "A" || hostname != "*.example.com" {
-		t.Errorf("ParseTXTKey(%q) = (%q, %q, %v), want (A, *.example.com, true)", key, recordType, hostname, ok)
 	}
 }
 

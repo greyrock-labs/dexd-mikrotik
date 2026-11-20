@@ -14,11 +14,9 @@ import (
 )
 
 const (
-	heritage         = "dexd-mikrotik"
-	ownerField       = "dexd-mikrotik/owner"
-	resourceField    = "dexd-mikrotik/resource"
-	wildcardTXTLabel = "wildcard-dexd-mikrotik"
-	wildcardDNSLabel = "*"
+	heritage      = "dexd-mikrotik"
+	ownerField    = "dexd-mikrotik/owner"
+	resourceField = "dexd-mikrotik/resource"
 )
 
 // OwnershipRecord holds the parsed payload of a TXT ownership record.
@@ -32,19 +30,7 @@ type OwnershipRecord struct {
 // e.g. TXTKey("", "A", "foo.example.com") == "a-foo.example.com"
 // e.g. TXTKey("talos.", "A", "foo.example.com") == "talos.a-foo.example.com"
 func TXTKey(prefix, recordType, dnsName string) string {
-	return prefix + strings.ToLower(recordType) + "-" + encodeTXTKeyHostname(dnsName)
-}
-
-// HostnameFromTXTKey reverses TXTKey: given the same prefix and record type, it
-// strips the leading "prefix+recordType-" from txtKey and returns the original
-// hostname. Returns ("", false) if txtKey does not carry the expected prefix.
-func HostnameFromTXTKey(prefix, recordType, txtKey string) (string, bool) {
-	expected := prefix + strings.ToLower(recordType) + "-"
-	hostname, ok := strings.CutPrefix(txtKey, expected)
-	if !ok {
-		return "", false
-	}
-	return decodeTXTKeyHostname(hostname), true
+	return prefix + strings.ToLower(recordType) + "-" + dnsName
 }
 
 // ParseTXTKey strips prefix from txtKey, then splits on the first '-' to
@@ -58,27 +44,7 @@ func ParseTXTKey(prefix, txtKey string) (recordType, hostname string, ok bool) {
 	if !ok || recordType == "" || hostname == "" {
 		return "", "", false
 	}
-	return strings.ToUpper(recordType), decodeTXTKeyHostname(hostname), true
-}
-
-func encodeTXTKeyHostname(hostname string) string {
-	labels := strings.Split(hostname, ".")
-	for i, label := range labels {
-		if label == wildcardDNSLabel {
-			labels[i] = wildcardTXTLabel
-		}
-	}
-	return strings.Join(labels, ".")
-}
-
-func decodeTXTKeyHostname(hostname string) string {
-	labels := strings.Split(hostname, ".")
-	for i, label := range labels {
-		if label == wildcardTXTLabel {
-			labels[i] = wildcardDNSLabel
-		}
-	}
-	return strings.Join(labels, ".")
+	return strings.ToUpper(recordType), hostname, true
 }
 
 // EncodeTXT produces the unquoted TXT record value for an ownership record.

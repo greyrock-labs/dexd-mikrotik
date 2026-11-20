@@ -179,8 +179,8 @@ labels:
 Use `dexd.routers.<name>.hostnames` to replace parsed hostnames entirely, or
 `dexd.routers.<name>.extra-hostnames` to append comma-separated names. Router
 `skip=true` wins over hostnames, extra hostnames, and target overrides.
-Wildcard hostnames such as `*.s3.example.com` are skipped with a warning,
-because RouterOS static names do not support `*` wildcards.
+dexd-mikrotik does not support wildcard hostnames: names such as
+`*.s3.example.com` are skipped with a warning.
 
 Standalone host blocks create records that are not tied to Traefik router
 labels:
