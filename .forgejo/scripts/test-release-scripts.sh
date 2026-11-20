@@ -90,6 +90,10 @@ commit "feat(source): support x"
 grep -q '^## \[1.0.2\]' CHANGELOG.md || fail "update-changelog: earlier release dropped"
 grep -q -- '- \*\*source:\*\* Support x' CHANGELOG.md || fail "update-changelog: feature missing"
 "$release" pending || fail "pending: want exit 0 after update-changelog adds v1.1.0"
+notes="$("$release" notes)"
+[[ "$notes" == "### Features"* ]] || fail "notes: want to start at '### Features', got '${notes%%$'\n'*}'"
+[[ "$notes" == *"- Handle empty label" ]] || fail "notes: want to end with the last fix, got '${notes##*$'\n'}'"
+[[ "$notes" != *"1.0.2"* && "$notes" != *"## ["* ]] || fail "notes: leaked another release section"
 
 new_repo
 got="$("$release" top)"

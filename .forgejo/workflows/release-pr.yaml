@@ -1,0 +1,44 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Release PR
+
+# Keeps a "chore(release): vX.Y.Z" pull request open whenever something
+# releasable has landed on main. Merging it is what ships a release. Run it by
+# hand to release even when only non-releasable commits are pending.
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: release-pr
+  cancel-in-progress: true
+
+jobs:
+  release-pr:
+    name: release-pr
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install tools
+        uses: https://github.com/jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+
+      - name: Update the release pull request
+        env:
+          FORGEJO_SERVER_URL: ${{ forgejo.server_url }}
+          FORGEJO_REPOSITORY: ${{ forgejo.repository }}
+          RELEASE_BOT_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+          # A manual run releases even when only non-releasable commits are pending.
+          MANUAL: ${{ forgejo.event_name == 'workflow_dispatch' }}
+        run: |
+          if [ "$MANUAL" = true ]; then
+            .forgejo/scripts/release-pr.sh --force
+          else
+            .forgejo/scripts/release-pr.sh
+          fi

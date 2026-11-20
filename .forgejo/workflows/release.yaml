@@ -2,20 +2,79 @@
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: Release
 
+# Ships the version at the top of CHANGELOG.md once the release pull request
+# that added it is merged. Every other push to main stops at the check job.
 on:
   push:
     branches:
       - main
-    tags:
-      - v*
 
 concurrency:
-  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  group: release
   cancel-in-progress: false
 
 jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      release: ${{ steps.check.outputs.release }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for an unreleased version
+        id: check
+        run: |
+          version="$(.forgejo/scripts/release-version.sh top)"
+          if .forgejo/scripts/release-version.sh pending; then
+            release=true
+            echo "Releasing $version."
+          else
+            release=false
+            echo "Nothing to release."
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+
+  # Nothing is published unless the tests pass on the release commit.
+  test:
+    name: test
+    needs: check
+    if: needs.check.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install tools
+        uses: https://github.com/jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+
+      - name: Check Go formatting
+        run: mise run fmt-check
+
+      - name: Vet
+        run: mise run vet
+
+      - name: Check go.mod tidiness
+        run: mise run tidy-check
+
+      - name: Lint
+        run: mise run lint
+
+      - name: Test
+        run: mise run test
+
   versions:
     name: versions
+    needs: check
+    if: needs.check.outputs.release == 'true'
     runs-on: ubuntu-latest
     outputs:
       go-version: ${{ steps.go.outputs.version }}
@@ -34,13 +93,16 @@ jobs:
 
   image:
     name: image
-    needs: versions
+    needs: [check, test, versions]
     runs-on: docker
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Install tools
+        uses: https://github.com/jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
 
       - name: Set up Docker Buildx
         uses: https://github.com/docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -60,19 +122,23 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ghcr.io/greyrock-labs/dexd-mikrotik
+          # Exactly X.Y.Z and latest. No other tag ever moves.
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
-            type=sha,prefix=sha-
+            type=semver,pattern={{version}},value=${{ needs.check.outputs.version }}
+            type=raw,value=latest
+          flavor: |
+            latest=false
           labels: |
             org.opencontainers.image.source=https://github.com/greyrock-labs/dexd-mikrotik
             org.opencontainers.image.url=https://github.com/greyrock-labs/dexd-mikrotik
+            org.opencontainers.image.version=${{ needs.check.outputs.version }}
           annotations: |
             org.opencontainers.image.source=https://github.com/greyrock-labs/dexd-mikrotik
             org.opencontainers.image.url=https://github.com/greyrock-labs/dexd-mikrotik
+            org.opencontainers.image.version=${{ needs.check.outputs.version }}
 
       - name: Build and push
+        id: build
         uses: https://github.com/docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         env:
           BUILDX_GIT_INFO: false
@@ -86,6 +152,33 @@ jobs:
           sbom: true
           provenance: false
           build-args: |
-            VERSION=${{ forgejo.ref_name }}
+            VERSION=${{ needs.check.outputs.version }}
             REVISION=${{ forgejo.sha }}
             GO_VERSION=${{ needs.versions.outputs.go-version }}
+
+      - name: Sign the image
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY "ghcr.io/greyrock-labs/dexd-mikrotik@${DIGEST}"
+
+  publish:
+    name: publish
+    needs: [check, image]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Tag and publish release notes
+        env:
+          FORGEJO_SERVER_URL: ${{ forgejo.server_url }}
+          FORGEJO_REPOSITORY: ${{ forgejo.repository }}
+          RELEASE_BOT_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+          GITHUB_MIRROR: greyrock-labs/dexd-mikrotik
+          GH_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          VERSION: ${{ needs.check.outputs.version }}
+        run: .forgejo/scripts/publish-release.sh "$VERSION"

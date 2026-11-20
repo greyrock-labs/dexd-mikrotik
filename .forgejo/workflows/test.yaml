@@ -40,6 +40,9 @@ jobs:
       - name: Test
         run: mise run test
 
+      - name: Test release scripts
+        run: mise run release-scripts-test
+
   image:
     name: image
     runs-on: docker
