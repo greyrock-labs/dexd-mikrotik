@@ -34,8 +34,6 @@ jobs:
           FORGEJO_SERVER_URL: ${{ forgejo.server_url }}
           FORGEJO_REPOSITORY: ${{ forgejo.repository }}
           RELEASE_BOT_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
-          RELEASE_BOT_NAME: ${{ vars.RELEASE_BOT_NAME }}
-          RELEASE_BOT_EMAIL: ${{ vars.RELEASE_BOT_EMAIL }}
           # A manual run releases even when only non-releasable commits are pending.
           MANUAL: ${{ forgejo.event_name == 'workflow_dispatch' }}
         run: |

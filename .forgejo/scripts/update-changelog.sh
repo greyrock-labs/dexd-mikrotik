@@ -11,3 +11,6 @@ if [[ -f CHANGELOG.md ]]; then
 else
   git cliff --unreleased --tag "$tag" --output CHANGELOG.md 2>/dev/null
 fi
+
+# Match the repo's formatting so the lint check (and its pre-commit hook) pass.
+oxfmt CHANGELOG.md >/dev/null

@@ -76,6 +76,7 @@ if "$release" pending; then fail "pending: want exit 1 when v1.0.2 is tagged"; f
 
 new_repo
 "$here/update-changelog.sh" v1.0.2
+oxfmt --check CHANGELOG.md >/dev/null 2>&1 || fail "update-changelog: first CHANGELOG.md is not oxfmt-clean"
 grep -qx '# Changelog' CHANGELOG.md || fail "update-changelog: header missing"
 grep -q 'Maintenance release with no user-facing changes.' CHANGELOG.md \
   || fail "update-changelog: empty release has no maintenance note"
@@ -85,6 +86,7 @@ git tag -a v1.0.2 -m v1.0.2
 commit "fix: handle empty label"
 commit "feat(source): support x"
 "$here/update-changelog.sh" "$("$next")"
+oxfmt --check CHANGELOG.md >/dev/null 2>&1 || fail "update-changelog: prepended CHANGELOG.md is not oxfmt-clean"
 [[ "$(grep -c '^# Changelog$' CHANGELOG.md)" == "1" ]] || fail "update-changelog: header duplicated"
 [[ "$("$release" top)" == "v1.1.0" ]] || fail "update-changelog: top is '$("$release" top)', want 'v1.1.0'"
 grep -q '^## \[1.0.2\]' CHANGELOG.md || fail "update-changelog: earlier release dropped"
