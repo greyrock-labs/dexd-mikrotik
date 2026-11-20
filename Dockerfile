@@ -2,7 +2,11 @@
 
 ARG GO_VERSION
 
-FROM golang:${GO_VERSION}-alpine AS builder
+# The builder always runs on the build host and cross-compiles for the target
+# platform, so multi-arch builds need no emulation.
+FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-alpine AS builder
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION=dev
 ARG REVISION=dev
 
@@ -12,7 +16,7 @@ RUN echo 'nobody:x:65534:65534:Nobody:/:' > /tmp/passwd && \
 WORKDIR /src
 
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${VERSION} -X main.Gitsha=${REVISION}" \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-s -w -X main.Version=${VERSION} -X main.Gitsha=${REVISION}" \
     ./cmd/dexd-mikrotik && upx --best --lzma dexd-mikrotik
 
 FROM scratch
