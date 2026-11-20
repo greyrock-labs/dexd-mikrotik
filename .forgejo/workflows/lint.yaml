@@ -1,0 +1,41 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Lint
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ forgejo.ref }}-${{ forgejo.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run actionlint
+        uses: https://github.com/bjw-s-labs/action-actionlint@b346813e82708106544f48a93a5b3fbeeb8e37eb # v0.1.1
+        with:
+          actionlint_config: .forgejo/actionlint.yaml
+          file_pattern: .forgejo/workflows/*.yaml
+
+  oxfmt:
+    name: oxfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install tools
+        uses: https://github.com/jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+
+      - name: Check formatting
+        run: mise run oxfmt-check

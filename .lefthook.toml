@@ -1,0 +1,14 @@
+[pre-commit.commands.fmt-check]
+glob = "**/*.go"
+run = "mise run fmt-check"
+
+[pre-commit.commands.oxfmt-check]
+run = "mise run oxfmt-check"
+
+[pre-commit.commands.mise-lock]
+glob = ".mise/*"
+run = "mise lock"
+stage_fixed = true
+
+[pre-push.commands.test]
+run = "mise run test"

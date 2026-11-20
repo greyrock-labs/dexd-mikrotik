@@ -1,0 +1,30 @@
+---
+# dexd-mikrotik: manages MikroTik RouterOS static DNS records for Traefik containers.
+# Deploy this alongside Traefik on your Docker host.
+services:
+  dexd-mikrotik:
+    image: ghcr.io/doonga/dexd-mikrotik:latest
+    container_name: dexd-mikrotik
+    restart: unless-stopped
+    environment:
+      # Required
+      MIKROTIK_BASEURL: ${MIKROTIK_BASEURL} # e.g. https://192.0.2.1 (RouterOS www-ssl)
+      MIKROTIK_USERNAME: ${MIKROTIK_USERNAME} # user with read,write,api,rest-api policies
+      MIKROTIK_PASSWORD: ${MIKROTIK_PASSWORD}
+      DEFAULT_TARGET: ${DEFAULT_TARGET} # default target; IPv4 → A record, hostname → CNAME
+
+      # Optional (shown with defaults)
+      MIKROTIK_SKIP_TLS_VERIFY: ${MIKROTIK_SKIP_TLS_VERIFY:-false}
+      TXT_OWNER: ${TXT_OWNER:-dexd-mikrotik}
+      TXT_PREFIX: ${TXT_PREFIX:-}
+      POLICY: ${POLICY:-sync}
+      DEFAULT_TTL: ${DEFAULT_TTL:-auto}
+      RECONCILE_INTERVAL: ${RECONCILE_INTERVAL:-5m}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      DRY_RUN: ${DRY_RUN:-false}
+      METRICS_ADDR: ${METRICS_ADDR:-:8080}
+    ports:
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro

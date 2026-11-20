@@ -1,0 +1,72 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: dexd-mikrotik
+  labels:
+    app.kubernetes.io/name: dexd-mikrotik
+spec:
+  groups:
+    - name: dexd-mikrotik.rules
+      rules:
+        - alert: DexdMikrotikNoSuccessfulReconcile
+          expr: time() - dexd_mikrotik_reconcile_last_success_timestamp_seconds > 900
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: dexd-mikrotik has not reconciled successfully
+            description: dexd-mikrotik has not completed a successful reconcile for more than 15 minutes.
+
+        - alert: DexdMikrotikReconcileErrors
+          expr: increase(dexd_mikrotik_reconcile_total{result="error"}[10m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: dexd-mikrotik reconcile errors
+            description: dexd-mikrotik reported one or more failed reconciles in the last 10 minutes.
+
+        - alert: DexdMikrotikSourceErrors
+          expr: increase(dexd_mikrotik_source_errors_total[10m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: dexd-mikrotik source discovery errors
+            description: dexd-mikrotik failed to list Docker containers or process source events in the last 10 minutes.
+
+        - alert: DexdMikrotikChangeErrors
+          expr: increase(dexd_mikrotik_changes_total{result="error"}[10m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: dexd-mikrotik DNS change errors
+            description: dexd-mikrotik failed to apply one or more DNS changes in the last 10 minutes.
+
+        - alert: DexdMikrotikProviderErrors
+          expr: increase(dexd_mikrotik_provider_errors_total[10m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: dexd-mikrotik provider errors
+            description: dexd-mikrotik saw RouterOS/provider API, network, or data errors in the last 10 minutes.
+
+        - alert: DexdMikrotikSlowReconcile
+          expr: histogram_quantile(0.95, rate(dexd_mikrotik_reconcile_duration_seconds_bucket[15m])) > 30
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: dexd-mikrotik slow reconciles
+            description: The p95 dexd-mikrotik reconcile duration has been above 30 seconds for 10 minutes.
+
+        - alert: DexdMikrotikConflicts
+          expr: sum(dexd_mikrotik_plan_changes{operation="conflict"}) > 0
+          for: 30m
+          labels:
+            severity: warning
+          annotations:
+            summary: dexd-mikrotik skipped conflicting hostnames
+            description: dexd-mikrotik has skipped one or more hostnames for over 30 minutes because of duplicate entries, unowned records, or another writer's ownership TXT record.

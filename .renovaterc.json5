@@ -1,0 +1,25 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended"],
+  packageRules: [
+    {
+      description: "Bump the Go module directive across minor versions",
+      matchManagers: ["gomod"],
+      matchDepNames: ["go"],
+      matchDepTypes: ["golang"],
+      rangeStrategy: "bump",
+    },
+    {
+      description: "Keep the Go module and mise toolchain versions aligned",
+      matchManagers: ["gomod", "mise"],
+      matchDepNames: ["go"],
+      groupName: "Go toolchain",
+      groupSlug: "go-toolchain",
+    },
+  ],
+  // Forgejo workflows use the GitHub Actions syntax.
+  "github-actions": {
+    managerFilePatterns: ["/^\\.forgejo/workflows/.+\\.ya?ml$/"],
+  },
+  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths"],
+}
