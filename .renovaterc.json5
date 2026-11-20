@@ -1,7 +1,21 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["config:recommended"],
+  extends: ["local>todd/renovate-config"],
+  // Forgejo workflows use the GitHub Actions syntax.
+  "github-actions": {
+    managerFilePatterns: ["/^\\.forgejo/workflows/.+\\.ya?ml$/"],
+  },
+  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths"],
+  // Commit types decide releases (see cliff.toml): fix releases a patch, chore
+  // releases nothing. These rules come after the shared preset's, so they win
+  // over its feat/feat! types for minor and major updates.
   packageRules: [
+    {
+      description: "Dependency updates never release on their own and are never breaking for dexd-mikrotik users",
+      matchPackageNames: ["*"],
+      semanticCommitType: "chore",
+      commitMessagePrefix: "{{semanticCommitType}}({{semanticCommitScope}}):",
+    },
     {
       description: "Bump the Go module directive across minor versions",
       matchManagers: ["gomod"],
@@ -10,16 +24,19 @@
       rangeStrategy: "bump",
     },
     {
-      description: "Keep the Go module and mise toolchain versions aligned",
+      description: "Go modules ship in the binary, so they release a patch",
+      matchManagers: ["gomod"],
+      semanticCommitType: "fix",
+      semanticCommitScope: "deps",
+    },
+    {
+      description: "Keep the Go module and mise toolchain versions aligned; the toolchain builds the binary, so it releases a patch",
       matchManagers: ["gomod", "mise"],
       matchDepNames: ["go"],
       groupName: "Go toolchain",
       groupSlug: "go-toolchain",
+      semanticCommitType: "fix",
+      semanticCommitScope: "deps",
     },
   ],
-  // Forgejo workflows use the GitHub Actions syntax.
-  "github-actions": {
-    managerFilePatterns: ["/^\\.forgejo/workflows/.+\\.ya?ml$/"],
-  },
-  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths"],
 }
