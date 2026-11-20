@@ -96,12 +96,21 @@ Conventional commits since the last `v*` tag reachable from `main`:
 
 ## Renovate (this repo)
 
-`.renovaterc.json5` sets `semanticCommitType` explicitly:
+`.renovaterc.json5` extends the maintainer's shared Renovate preset, like the
+maintainer's other Forgejo repos. That preset sets commit types by update size
+(major → `feat!`, minor → `feat`, patch → `fix`), which would turn dependency
+bumps into minor and major releases. This repo overrides it, and its rules win
+because repo rules apply after presets:
 
-- `fix` (releases): Go modules and the Go toolchain group (the `gomod` `go`
-  directive plus the mise `go` tool, which sets the builder image).
-- `chore` (no release): everything else, such as CI actions, mise dev tools
-  and linters.
+- Go modules and the Go toolchain group (the `gomod` `go` directive plus the
+  mise `go` tool, which sets the builder image) are always `fix(deps)`, which
+  means a patch release.
+- Everything else keeps the preset's non-releasing types (`ci`, `chore`).
+- No Renovate commit carries a breaking `!`. A dependency's major bump doesn't
+  break people running dexd-mikrotik. Only human `feat!:` commits make a major
+  release.
+- Repo-specific settings stay: Forgejo workflow paths for the
+  `github-actions` manager, the Go toolchain group, and `gomodTidy`.
 
 ## Bot account and secrets
 
