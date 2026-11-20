@@ -55,6 +55,9 @@ jobs:
       - name: Extract metadata
         id: meta
         uses: https://github.com/docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        env:
+          # GHCR links the package to its repository from the image index annotations.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
           images: ghcr.io/greyrock-labs/dexd-mikrotik
           tags: |
@@ -76,6 +79,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
           sbom: true
           provenance: false
           build-args: |
