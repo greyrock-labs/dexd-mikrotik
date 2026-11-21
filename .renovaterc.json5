@@ -1,6 +1,6 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["local>todd/renovate-config"],
+  extends: ["local>greyrock-labs/renovate-config"],
   // Forgejo workflows use the GitHub Actions syntax.
   "github-actions": {
     managerFilePatterns: ["/^\\.forgejo/workflows/.+\\.ya?ml$/"],
