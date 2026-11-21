@@ -52,8 +52,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install tools
+      # Only mise itself is needed to read the Go version; the tools build
+      # inside the image.
+      - name: Install mise
         uses: https://github.com/jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          install: false
 
       - name: Read Go version
         id: go
@@ -62,6 +66,44 @@ jobs:
       - name: Set up Docker Buildx
         uses: https://github.com/docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
+      # The build cache lives in the release bot's container registry on this
+      # Forgejo, so dependency layers are reused between runs. Runs without the
+      # secret (pull requests from forks) build without a cache.
+      - name: Find build cache
+        id: cache
+        env:
+          RELEASE_BOT_TOKEN: ${{ secrets.RELEASE_BOT_TOKEN }}
+          FORGEJO_SERVER_URL: ${{ forgejo.server_url }}
+          FORGEJO_REPOSITORY: ${{ forgejo.repository }}
+        run: |
+          if [[ -z "$RELEASE_BOT_TOKEN" ]]; then
+            echo "No RELEASE_BOT_TOKEN: building without a cache."
+            exit 0
+          fi
+          api="$FORGEJO_SERVER_URL/api/v1"
+          auth="Authorization: token $RELEASE_BOT_TOKEN"
+          login="$(curl -fsS -H "$auth" "$api/user" | jq -r .login)"
+          # The runner may reach Forgejo by an internal plain-HTTP address,
+          # which Docker refuses as a registry. Use the public address.
+          html_url="$(curl -fsS -H "$auth" "$api/repos/$FORGEJO_REPOSITORY" | jq -r .html_url)"
+          host="${html_url#*://}"
+          host="${host%%/*}"
+          {
+            echo "registry=$host"
+            echo "username=$login"
+            echo "ref=$host/$login/dexd-mikrotik-cache:amd64"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Log in to the cache registry
+        if: steps.cache.outputs.ref != ''
+        # Like the cache itself, a failed login must not fail the build.
+        continue-on-error: true
+        uses: https://github.com/docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ steps.cache.outputs.registry }}
+          username: ${{ steps.cache.outputs.username }}
+          password: ${{ secrets.RELEASE_BOT_TOKEN }}
+
       - name: Build image
         uses: https://github.com/docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -69,3 +111,6 @@ jobs:
           push: false
           platforms: linux/amd64
           build-args: GO_VERSION=${{ steps.go.outputs.version }}
+          cache-from: ${{ steps.cache.outputs.ref && format('type=registry,ref={0}', steps.cache.outputs.ref) || '' }}
+          # A failed cache upload never fails the build.
+          cache-to: ${{ steps.cache.outputs.ref && format('type=registry,ref={0},mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true', steps.cache.outputs.ref) || '' }}

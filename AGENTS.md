@@ -81,12 +81,20 @@ releases a patch. Everything else is `chore` and never carries `!`.
 The scripts behind this live in `.forgejo/scripts/`, and
 `mise run release-scripts-test` tests them. Repo secrets: `RELEASE_BOT_TOKEN`
 (the `keymaker` Forgejo token, with repository and issue write plus
-`read:user` for its own name and email),
+`read:user` for its own name and email, and `write:package` for the build
+cache),
 `GHCR_TOKEN` (a GitHub classic PAT with `write:packages` and `public_repo`, used
 for image pushes and GitHub releases), and `COSIGN_PRIVATE_KEY` plus
 `COSIGN_PASSWORD` (signing key; the public half is `cosign.pub`). Images carry
 an SBOM but no provenance attestation. Pull requests run tests and lint via
 `.forgejo/workflows/test.yaml` and `lint.yaml`.
+
+The Test workflow's `linux/amd64` image build keeps a BuildKit cache
+(`mode=max`) in the release bot's namespace of this Forgejo's container
+registry, as `<bot>/dexd-mikrotik-cache:amd64`. It is a cache, never an image
+to pull or deploy. Runs without `RELEASE_BOT_TOKEN` build uncached, and a
+failed cache upload never fails the build. The release workflow does not use
+it.
 
 ## Safety invariants
 
