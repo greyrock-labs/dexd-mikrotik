@@ -112,5 +112,7 @@ jobs:
           platforms: linux/amd64
           build-args: GO_VERSION=${{ steps.go.outputs.version }}
           cache-from: ${{ steps.cache.outputs.ref && format('type=registry,ref={0}', steps.cache.outputs.ref) || '' }}
-          # A failed cache upload never fails the build.
-          cache-to: ${{ steps.cache.outputs.ref && format('type=registry,ref={0},mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true', steps.cache.outputs.ref) || '' }}
+          # Only pushes (to main) write the cache. Every export replaces the
+          # whole ref, so a pull request that changes dependencies would
+          # otherwise evict main's layers. A failed upload never fails the build.
+          cache-to: ${{ forgejo.event_name == 'push' && steps.cache.outputs.ref && format('type=registry,ref={0},mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true', steps.cache.outputs.ref) || '' }}

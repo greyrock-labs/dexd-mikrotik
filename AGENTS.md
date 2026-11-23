@@ -92,7 +92,9 @@ an SBOM but no provenance attestation. Pull requests run tests and lint via
 The Test workflow's `linux/amd64` image build keeps a BuildKit cache
 (`mode=max`) in the release bot's namespace of this Forgejo's container
 registry, as `<bot>/dexd-mikrotik-cache:amd64`. It is a cache, never an image
-to pull or deploy. Runs without `RELEASE_BOT_TOKEN` build uncached, and a
+to pull or deploy. Every run reads it, but only pushes to `main` write it,
+because each export replaces the whole ref and a pull request would evict
+`main`'s layers. Runs without `RELEASE_BOT_TOKEN` build uncached, and a
 failed cache upload never fails the build. The release workflow does not use
 it.
 
